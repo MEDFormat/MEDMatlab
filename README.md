@@ -1,0 +1,1 @@
+These are Matlab M files and C code for Matlab mex functions.  Compilation is platform specific.  Contact me directly (matt@medformat.org) if you want to work on these & I'll assist with compilation scripts.
