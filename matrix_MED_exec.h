@@ -1,39 +1,35 @@
 
 // Written by Matt Stead
-// Copyright Dark Horse Neuro Inc, 2020
+// Copyright Dark Horse Neuro Inc, 2024
 
 #ifndef MATRIX_MED_IN
 #define MATRIX_MED_IN
 
-// Define Persistent (before medlib_m12.h)
-#define MATLAB_PERSISTENT_m12
-
 //Includes
 #include "medlib_m12.h"
 
-// Other Defines
-
-// Version
-#define LS_READ_MED_VER_MAJOR				((ui1) 1)
-#define LS_READ_MED_VER_MINOR				((ui1) 1)
+// Version (Read_MED package including matrix_MED)
+#define READ_MED_VER_MAJOR	((ui1) 1)
+#define READ_MED_VER_MINOR	((ui1) 1)
 
 // Miscellaneous
-#define MAX_CHANNELS					512
+#define MAX_CHANNELS		512
 
 // Persistent Behaviors
-#define PERSIST_CLOSE		((ui1) 1)	// close & free any open session & return
-#define PERSIST_OPEN		((ui1) 2)	// close & free any open session, open new session & return
+#define PERSIST_OPEN		((ui1) 1)	// close & free any open session, open new session, & return
+#define PERSIST_CLOSE		((ui1) 2)	// close & free any open session & return
 #define PERSIST_READ		((ui1) 4)	// read current session (& open if none exists), replace existing parameters with non-empty passed parameters
-#define PERSIST_READ_NEW	(PERSIST_OPEN | PERSIST_READ)	// close any open session, open & read new session
-#define PERSIST_READ_CLOSE	(PERSIST_CLOSE | PERSIST_READ)	// close any open session, open & read new session (default behavior)
+#define PERSIST_READ_NEW	(PERSIST_READ | PERSIST_OPEN)	// close & free any open session, open & read new session, leave open after read
+#define PERSIST_READ_CLOSE	(PERSIST_READ | PERSIST_CLOSE)	// close & free any open session, open & read new session, close after read
+#define PERSIST_NONE		PERSIST_READ_CLOSE	// default
 
 // Matlab Raw Page Structure
 #define NUMBER_OF_MATRIX_FIELDS_mat			10
 #define MATRIX_FIELD_NAMES_mat { \
-        "start_time", \
-	"start_time_string", \
-        "end_time", \
-        "end_time_string", \
+        "slice_start_time", \
+	"slice_start_time_string", \
+        "slice_end_time", \
+        "slice_end_time_string", \
 	"sampling_frequencies", \
 	"contigua", \
 	"records", \
@@ -41,10 +37,10 @@
 	"minima", \
 	"maxima" \
 }
-#define MATRIX_FIELDS_START_TIME_UUTC_IDX_mat		0
-#define MATRIX_FIELDS_START_TIME_STRING_IDX_mat		1
-#define MATRIX_FIELDS_END_TIME_UUTC_IDX_mat		2
-#define MATRIX_FIELDS_END_TIME_STRING_IDX_mat		3
+#define MATRIX_FIELDS_SLICE_START_TIME_UUTC_IDX_mat	0
+#define MATRIX_FIELDS_SLICE_START_TIME_STRING_IDX_mat	1
+#define MATRIX_FIELDS_SLICE_END_TIME_UUTC_IDX_mat	2
+#define MATRIX_FIELDS_SLICE_END_TIME_STRING_IDX_mat	3
 #define MATRIX_FIELDS_SAMPLING_FREQUENCIES_IDX_mat	4
 #define MATRIX_FIELDS_CONTIGUA_IDX_mat			5
 #define MATRIX_FIELDS_RECORDS_IDX_mat			6

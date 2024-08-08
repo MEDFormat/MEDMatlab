@@ -21,42 +21,22 @@
 
 #include "read_MED_exec.h"
 
-// Saved Session & Medlib Globals
-static SESSION_m12		*session_ptr = NULL;
-static si4			globals_list_len = 0;
-static GLOBALS_m12		**globals_list_ptr = NULL;
-static pthread_mutex_t_m12	globals_list_mutex;
-static GLOBAL_TABLES_m12	*global_tables_ptr = NULL;
+// Globals
+static TERN_m12			loaded = FALSE_m12;
+static SESSION_m12		*med_sess = NULL;
 
 
-// Mex Exit function
-void	mexExitFunction(void) {
-	
-	// session cannot be cleared without clearing globals at this time
-	if (session_ptr != NULL) {
-		
-		extern si4			globals_list_len_m12;
-		extern GLOBALS_m12		**globals_list_m12;
-		extern pthread_mutex_t_m12	globals_list_mutex_m12;
-		extern GLOBAL_TABLES_m12	*global_tables_m12;
-		
-		// free session
-		G_free_session_m12(session_ptr, TRUE_m12);
-		
-		// free globals
-		globals_list_len_m12 = 1;  // this is not set up for parallel mex calls right now, so should only be one entry
-		globals_list_mutex_m12 = globals_list_mutex;
-		globals_list_m12 = globals_list_ptr;
-		// pid is preserved between mex calls
-		global_tables_m12 = global_tables_ptr;
-		G_free_globals_m12(TRUE_m12);
-		
-		// not necessary when this is called because function cleared, but also used for reset
-		session_ptr = NULL;
-		globals_list_len = 0;
-		globals_list_ptr = NULL;
-		global_tables_ptr = NULL;
+// Mex exit function
+void	mexExitFunction(void)
+{
+	// free session
+	if (med_sess != NULL) {
+		G_free_session_m12(med_sess, TRUE_m12);
+		med_sess = NULL;
 	}
+	
+	// free globals (pid is preserved between mex calls)
+	G_free_globals_m12(TRUE_m12);
 	
 	return;
 }
@@ -65,10 +45,6 @@ void	mexExitFunction(void) {
 // Mex gateway routine
 void    mexFunction(si4 nlhs, mxArray *plhs[], si4 nrhs, const mxArray *prhs[])
 {
-	extern si4			globals_list_len_m12;
-	extern GLOBALS_m12		**globals_list_m12;
-	extern pthread_mutex_t_m12	globals_list_mutex_m12;
-	extern GLOBAL_TABLES_m12	*global_tables_m12;
 	TERN_m12                	samples_as_singles;
         void                    	*file_list;
 	ui1				persist_mode;
@@ -76,21 +52,36 @@ void    mexFunction(si4 nlhs, mxArray *plhs[], si4 nrhs, const mxArray *prhs[])
         si1                     	reference_channel[FULL_FILE_NAME_BYTES_m12];
         si4                     	i, len, max_len, n_files;
         si8                     	start_time, end_time, start_index, end_index, tmp_si8;
-        mxArray                 	*mx_cell_p, *sess;
+        mxArray                 	*mx_cell_p, *mat_sess;
 
+	
+	// function loaded
+	if (loaded == FALSE_m12) {
+		// register exit function
+		mexAtExit(mexExitFunction);
+		
+		// adjust process limits
+		PROC_adjust_open_file_limit_m12(MAX_OPEN_FILES_m12(MAX_CHANNELS, 1), FALSE_m12);
+		PROC_increase_process_priority_m12(FALSE_m12, FALSE_m12);
+		
+		// initialze medlib
+		G_initialize_medlib_m12(FALSE_m12, FALSE_m12);
+		
+		loaded = TRUE_m12;
+	}
 	
 	//  check for proper number of arguments
 	if (nlhs != 1)
 		mexErrMsgTxt("One output required: MED session structure, or logical value\n");
 	plhs[0] = mxCreateLogicalScalar((mxLogical) 0);  // set "false" return value for subsequent errors
-	if (nrhs < 3 || nrhs > 9)
-		mexErrMsgTxt("Three to 9 inputs required: file_list, [start_time], [end_time], [start_index], [start_index], [password], [reference_channel], [samples_as_singles], [persistence_mode]\n");
+	if (nrhs < 1 || nrhs > 9)
+		mexErrMsgTxt("One to 9 inputs required: file_list, [start_time], [end_time], [start_index], [start_index], [password], [reference_channel], [samples_as_singles], [persistence_mode]\n");
 
 	// get persistence mode if passed
-	persist_mode = PERSIST_READ_CLOSE;  // default
+	persist_mode = PERSIST_NONE; // default (== PERSIST_READ_CLOSE)
 	if (nrhs == 9) {
-		if (mxIsEmpty(prhs[8]) == 0) {  // passed char array
-			if (mxGetClassID(prhs[8]) == mxCHAR_CLASS) {
+		if (mxIsEmpty(prhs[8]) == 0) {
+			if (mxGetClassID(prhs[8]) == mxCHAR_CLASS) {  // passed char array
 				mxGetString(prhs[8], temp_str, 16);
 				switch (*temp_str) {
 					case 'c':  // "close"
@@ -103,37 +94,44 @@ void    mexFunction(si4 nlhs, mxArray *plhs[], si4 nrhs, const mxArray *prhs[])
 						break;
 					case 'r':  // "read"
 					case 'R':
-						if (*(temp_str + 4) == 0)  // "read"
+						if (*(temp_str + 4) == 0)  // "read" only
 							persist_mode = PERSIST_READ;
 						else if (*(temp_str + 5) == 'n' || *(temp_str + 5) == 'N')  // "read new"
 							persist_mode = PERSIST_READ_NEW;
+						// else leave as "read close" (default)
 						break;
-					default:  // includes "none" & "read close" (default)
+					default:  // includes "none" (default)
 						break;
 				}
-			} else {
+			} else {  // passed number
 				tmp_si8 = get_si8_scalar(prhs[8]);
-				if (tmp_si8 >= 1 && tmp_si8 <= 7)
+				if (tmp_si8 < 0 || tmp_si8 > 6 || tmp_si8 == 3)
+					mexErrMsgTxt("Invalid persist mode (input 9)\n");
+				if (tmp_si8)  // if zero, leave as 6 ("read close" == "none")
 					persist_mode = (ui1) tmp_si8;
 			}
 		}
 	}
 	
-	if (persist_mode & (PERSIST_CLOSE | PERSIST_OPEN)) {
-		mexExitFunction();
-		if (persist_mode == PERSIST_CLOSE) {  // "read" flag not set
-			mxDestroyArray(plhs[0]);
-			plhs[0] = mxCreateLogicalScalar((mxLogical) 1);  // return "true"
-			return;
+	if (persist_mode & PERSIST_OPEN || persist_mode == PERSIST_CLOSE) {
+		if (med_sess != NULL) {  // free session
+			G_free_session_m12(med_sess, TRUE_m12);
+			med_sess = NULL;
+			if (persist_mode == PERSIST_CLOSE) {  // set return to "true" for session closed
+				mxDestroyArray(plhs[0]);
+				plhs[0] = mxCreateLogicalScalar((mxLogical) 1);
+			}
 		}
+		if (persist_mode == PERSIST_CLOSE)
+			return;
 	}
 	
         // get the input file name(s) (argument 1)
 	n_files = max_len = 0;
-	if (mxIsEmpty(prhs[0]) == 1 && session_ptr == NULL)
+	if (mxIsEmpty(prhs[0]) == 1 && med_sess == NULL)
 		mexErrMsgTxt("No input files specified\n");
         if (mxGetClassID(prhs[0]) == mxCHAR_CLASS) {
-                max_len = mxGetNumberOfElements(prhs[0]) + 1; // Get the length of the input string
+                max_len = mxGetNumberOfElements(prhs[0]); // Get the length of the input string
 		if (max_len > FULL_FILE_NAME_BYTES_m12)
 			mexErrMsgTxt("'file_list' (input 1) is too long\n");
         } else if (mxGetClassID(prhs[0]) == mxCELL_CLASS) {
@@ -144,7 +142,7 @@ void    mexFunction(si4 nlhs, mxArray *plhs[], si4 nrhs, const mxArray *prhs[])
                         mx_cell_p = mxGetCell(prhs[0], i);
 			if (mxGetClassID(mx_cell_p) != mxCHAR_CLASS)
 				mexErrMsgTxt("Elements of file_list cell array must be char arrays\n");
-                        len = mxGetNumberOfElements(mx_cell_p) + 1; // Get the length of the input string
+                        len = mxGetNumberOfElements(mx_cell_p); // Get the length of the input string
                         if (len > FULL_FILE_NAME_BYTES_m12)
 				mexErrMsgTxt("'file_list' (input 1) is too long\n");
                         if (len > max_len)
@@ -153,6 +151,7 @@ void    mexFunction(si4 nlhs, mxArray *plhs[], si4 nrhs, const mxArray *prhs[])
         } else {
 		mexErrMsgTxt("'file_list' (input 1) must be a string or cell array\nStrings may include regular expressions (regex)\n");
         }
+	max_len += TYPE_BYTES_m12;  // add room for med type extension, in case not included
 	
         // start_time
         start_time = UUTC_NO_ENTRY_m12;
@@ -283,25 +282,6 @@ void    mexFunction(si4 nlhs, mxArray *plhs[], si4 nrhs, const mxArray *prhs[])
 		}
         }
 		
-	// initialize MED library
-	if (globals_list_len) {
-		globals_list_len_m12 = 1;  // this is not set up for parallel mex calls right now, so should only be one entry
-		globals_list_mutex_m12 = globals_list_mutex;
-		globals_list_m12 = globals_list_ptr;
-		// pid is preserved between mex calls
-		global_tables_m12 = global_tables_ptr;
-	} else {
-		mexAtExit(mexExitFunction);
-		PROC_adjust_open_file_limit_m12(MAX_OPEN_FILES_m12(MAX_CHANNELS, 1), FALSE_m12);
-		PROC_increase_process_priority_m12(FALSE_m12, FALSE_m12);
-
-		G_initialize_medlib_m12(FALSE_m12, FALSE_m12);
-		globals_list_len = 1;  // this is not set up for parallel mex calls right now, so should only be one entry
-		globals_list_mutex = globals_list_mutex_m12;
-		globals_list_ptr = globals_list_m12;
-		global_tables_ptr = global_tables_m12;
-	}
-                
 	// create input file list
 	file_list = NULL;
 	switch (n_files) {
@@ -324,19 +304,21 @@ void    mexFunction(si4 nlhs, mxArray *plhs[], si4 nrhs, const mxArray *prhs[])
 			}
 			break;
 	}
-		
+			
         // get out of here
-	sess = read_MED(file_list, n_files, start_time, end_time, start_index, end_index, password, reference_channel, samples_as_singles, persist_mode);
-	if (sess != NULL) {
+	mat_sess = read_MED(file_list, n_files, start_time, end_time, start_index, end_index, password, reference_channel, samples_as_singles, persist_mode);
+	if (mat_sess != NULL) {
 		mxDestroyArray(plhs[0]);
-		plhs[0] = sess;
+		plhs[0] = mat_sess;
 	}
 
         // clean up
 	free_m12(file_list, __FUNCTION__);
 	
-	if (persist_mode & PERSIST_CLOSE)
-		mexExitFunction();
+	if (persist_mode & PERSIST_CLOSE) {
+		G_free_session_m12(med_sess, TRUE_m12);  // resets session globals (no not need to free until function unloaded)
+		med_sess = NULL;
+	}
 	
         return;
 }
@@ -355,16 +337,17 @@ mxArray     *read_MED(void *file_list, si4 n_files, si8 start_time, si8 end_time
         SEGMENT_m12                             *seg;
         CMP_PROCESSING_STRUCT_m12               *cps;
         TIME_SLICE_m12                          slice;
-        mxArray                                 *mat_session, *mat_channels;
+        mxArray                                 *mat_sess, *mat_chans;
         mxArray                                	*mat_data;
 	mwSize					dims[2];
-        const si4                               n_mat_session_fields = NUMBER_OF_SESSION_FIELDS_mat;
-        const si1                               *mat_session_field_names[] = SESSION_FIELD_NAMES_mat;
+        const si4                               n_mat_sess_fields = NUMBER_OF_SESSION_FIELDS_mat;
+        const si1                               *mat_sess_field_names[] = SESSION_FIELD_NAMES_mat;
         const si4                               n_mat_channel_fields = NUMBER_OF_CHANNEL_FIELDS_mat;
         const si1                               *mat_channel_field_names[] = CHANNEL_FIELD_NAMES_mat;
 
 
-	sess = session_ptr;  // copy global
+	// copy global
+	sess = med_sess;
 	
         // read session
         G_initialize_time_slice_m12(&slice);
@@ -375,15 +358,17 @@ mxArray     *read_MED(void *file_list, si4 n_files, si8 start_time, si8 end_time
 	if (*ref_chan)
 		strcpy(globals_m12->reference_channel_name, ref_chan);
 	flags = (LH_INCLUDE_TIME_SERIES_CHANNELS_m12 | LH_READ_SLICE_SEGMENT_DATA_m12 | LH_READ_SLICE_SESSION_RECORDS_m12 | LH_READ_SLICE_SEGMENTED_SESS_RECS_m12);
-	if (persist_mode & PERSIST_CLOSE)
-		flags |= LH_NO_CPS_CACHING_m12;  // not efficient for single reads
-	else
+	if (persist_mode & PERSIST_CLOSE) {
+		if (med_sess == NULL)
+			flags |= LH_NO_CPS_CACHING_m12;  // not efficient for single reads
+	} else {
 		flags |= LH_MAP_ALL_SEGMENTS_m12;  // more efficient for sequential reads
+	}
 	    
 	if (persist_mode == PERSIST_OPEN) {
 		sess = G_open_session_m12(NULL, &slice, file_list, n_files, flags, password);
 		if (sess != NULL) {
-			session_ptr = sess;  // save session
+			med_sess = sess;  // save session
 			return(mxCreateLogicalScalar((mxLogical) 1));
 		}
 		action_str = "open";
@@ -405,7 +390,10 @@ mxArray     *read_MED(void *file_list, si4 n_files, si8 start_time, si8 end_time
 			}
 		}
 		putchar_m12('\n');
-		session_ptr = NULL;  // set global
+		if (med_sess != NULL) {  // free session if exists
+			G_free_session_m12(med_sess, TRUE_m12);
+			med_sess = NULL;
+		}
 		return(NULL);
 	}
 
@@ -414,21 +402,24 @@ mxArray     *read_MED(void *file_list, si4 n_files, si8 start_time, si8 end_time
         /* ****************************************** */
 
         // Create session output structure
-        mat_session = mxCreateStructMatrix(1, 1, n_mat_session_fields, mat_session_field_names);
+        mat_sess = mxCreateStructMatrix(1, 1, n_mat_sess_fields, mat_sess_field_names);
 
         // Create channel output structures
         n_channels = sess->number_of_time_series_channels;
-        mat_channels = mxCreateStructMatrix(n_channels, 1, n_mat_channel_fields, mat_channel_field_names);
-        mxSetFieldByNumber(mat_session, 0, SESSION_FIELDS_CHANNELS_IDX_mat, mat_channels);
+        mat_chans = mxCreateStructMatrix(n_channels, 1, n_mat_channel_fields, mat_channel_field_names);
+        mxSetFieldByNumber(mat_sess, 0, SESSION_FIELDS_CHANNELS_IDX_mat, mat_chans);
 
+	// build channel names (duplicated in metadata, but convenient for viewing
+	build_channel_names(sess, mat_sess);
+	
 	// Build metadata
-	build_metadata(sess, mat_session);
+	build_metadata(sess, mat_sess);
 
 	// Build contigua
-	build_contigua(sess, mat_session);
+	build_contigua(sess, mat_sess);
 	
        // Build session records
-        build_session_records(sess, mat_session);
+        build_session_records(sess, mat_sess);
 	
        // Fill in channel data
 	n_segments = sess->time_slice.number_of_segments;
@@ -456,25 +447,25 @@ mxArray     *read_MED(void *file_list, si4 n_files, si8 start_time, si8 end_time
 					*mat_sf8_samps++ = (sf8) *seg_samps++;
                         }
                 }
-                mxSetFieldByNumber(mat_channels, i, CHANNEL_FIELDS_DATA_IDX_mat, mat_data);
+                mxSetFieldByNumber(mat_chans, i, CHANNEL_FIELDS_DATA_IDX_mat, mat_data);
         }
 
 	// set global
-	session_ptr = sess;
+	med_sess = sess;
 
-        return(mat_session);
+        return(mat_sess);
 }
 
 
 // NOTE: this function assumes all discontinuities are session wide, which is not required by MED
-void	build_contigua(SESSION_m12 *sess, mxArray *mat_session)
+void	build_contigua(SESSION_m12 *sess, mxArray *mat_sess)
 {
 	TERN_m12			relative_days;
 	si1				time_str[TIME_STRING_BYTES_m12];
         si8                             i, j, n_chans, n_contigs, samp_num, slice_start_sample_number, val;
         CHANNEL_m12                     *chan;
 	CONTIGUON_m12			*contigua;
-	mxArray                         *mat_sess_contigua, *mat_chan_contigua, *mat_channels, *tmp_mxa;
+	mxArray                         *mat_sess_contigua, *mat_chan_contigua, *mat_chans, *tmp_mxa;
 	mwSize				n_dims, dims[2];
         const si4                       n_mat_contiguon_fields = NUMBER_OF_CONTIGUON_FIELDS_mat;
         const si1                       *mat_contiguon_field_names[] = CONTIGUON_FIELD_NAMES_mat;
@@ -528,11 +519,11 @@ void	build_contigua(SESSION_m12 *sess, mxArray *mat_session)
 		tmp_mxa = mxCreateString(time_str);
 		mxSetFieldByNumber(mat_sess_contigua, i, CONTIGUON_FIELDS_END_TIME_STRING_IDX_mat, tmp_mxa);
 	}
-	mxSetFieldByNumber(mat_session, 0, SESSION_FIELDS_CONTIGUA_IDX_mat, mat_sess_contigua);
+	mxSetFieldByNumber(mat_sess, 0, SESSION_FIELDS_CONTIGUA_IDX_mat, mat_sess_contigua);
 
 	// copy session contigua into channels
 	n_chans = sess->number_of_time_series_channels;
-	mat_channels = mxGetFieldByNumber(mat_session, 0, SESSION_FIELDS_CHANNELS_IDX_mat);
+	mat_chans = mxGetFieldByNumber(mat_sess, 0, SESSION_FIELDS_CHANNELS_IDX_mat);
 	n_chans = sess->number_of_time_series_channels;
 	for (i = 0; i < n_chans; ++i) {
 		// copy session contigua
@@ -551,14 +542,42 @@ void	build_contigua(SESSION_m12 *sess, mxArray *mat_session)
 				*((si8 *) mxGetPr(tmp_mxa)) = (samp_num - slice_start_sample_number) + 1;
 			}
 		}
-		mxSetFieldByNumber(mat_channels, i, CHANNEL_FIELDS_CONTIGUA_IDX_mat, mat_chan_contigua);
+		mxSetFieldByNumber(mat_chans, i, CHANNEL_FIELDS_CONTIGUA_IDX_mat, mat_chan_contigua);
 	}
  
         return;
 }
 
 
-void    build_metadata(SESSION_m12 *sess, mxArray *mat_session)
+void	build_channel_names(SESSION_m12 *sess, mxArray *mat_sess)
+{
+	si4				seg_idx;
+	si8                             i, n_chans;
+	TIME_SLICE_m12			*slice;
+	CHANNEL_m12                     *chan;
+	FILE_PROCESSING_STRUCT_m12	*metadata_fps;
+	UNIVERSAL_HEADER_m12		*uh;
+	mxArray                         *tmp_mxa, *mat_chans;
+	
+	
+	// create name cell strings array
+	n_chans = sess->number_of_time_series_channels;
+	slice = &sess->time_slice;
+	seg_idx = G_get_segment_index_m12(slice->start_segment_number);
+	mat_chans = mxGetFieldByNumber(mat_sess, 0, SESSION_FIELDS_CHANNELS_IDX_mat);
+	for (i = 0; i < n_chans; ++i) {
+		chan = sess->time_series_channels[i];
+		metadata_fps = chan->segments[seg_idx]->metadata_fps;
+		uh = metadata_fps->universal_header;
+		tmp_mxa = mxCreateString(uh->channel_name);
+		mxSetFieldByNumber(mat_chans, i, CHANNEL_FIELDS_NAME_IDX_mat, tmp_mxa);
+	}
+	
+	return;
+}
+
+
+void    build_metadata(SESSION_m12 *sess, mxArray *mat_sess)
 {
 	TERN_m12				relative_days;
         si1                                     time_str[TIME_STRING_BYTES_m12];
@@ -570,14 +589,13 @@ void    build_metadata(SESSION_m12 *sess, mxArray *mat_session)
         UNIVERSAL_HEADER_m12                    *uh;
         TIME_SERIES_METADATA_SECTION_2_m12      *tmd2;
         METADATA_SECTION_3_m12                  *md3;
-        mxArray                                 *tmp_mxa, *mat_sess_metadata, *mat_chan_metadata, *mat_channels;
+        mxArray                                 *tmp_mxa, *mat_sess_metadata, *mat_chan_metadata, *mat_chans;
 	const si4                               n_mat_metadata_fields = NUMBER_OF_METADATA_FIELDS_mat;
 	const si1                               *mat_metadata_field_names[] = METADATA_FIELD_NAMES_mat;
 	
 	
 	slice = &sess->time_slice;
 	seg_idx = G_get_segment_index_m12(slice->start_segment_number);
-//	metadata_fps = sess->time_series_metadata_fps;  // ephemeral
 	metadata_fps = globals_m12->reference_channel->segments[seg_idx]->metadata_fps;  // reference channel first segment (more efficient)
         uh = metadata_fps->universal_header;
 	if (uh->type_code != TIME_SERIES_METADATA_FILE_TYPE_CODE_m12)
@@ -591,31 +609,31 @@ void    build_metadata(SESSION_m12 *sess, mxArray *mat_session)
 		relative_days = TRUE_m12;
 	
 	mat_sess_metadata = mxCreateStructMatrix(1, 1, n_mat_metadata_fields, mat_metadata_field_names);
-	mxSetFieldByNumber(mat_session, 0, SESSION_FIELDS_METADATA_IDX_mat, mat_sess_metadata);
+	mxSetFieldByNumber(mat_sess, 0, SESSION_FIELDS_METADATA_IDX_mat, mat_sess_metadata);
 
 	// path
         tmp_mxa = mxCreateString(sess->path);
         mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_PATH_IDX_mat, tmp_mxa);
 
-        // start time uutc
+        // slice start time uutc
         tmp_mxa = mxCreateNumericArray(n_dims, dims, mxINT64_CLASS, mxREAL);
         *((si8 *) mxGetPr(tmp_mxa)) = slice->start_time;
-        mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_START_TIME_UUTC_IDX_mat, tmp_mxa);
+        mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_SLICE_START_TIME_UUTC_IDX_mat, tmp_mxa);
 
-        // end time uutc
+        // slice end time uutc
         tmp_mxa = mxCreateNumericArray(n_dims, dims, mxINT64_CLASS, mxREAL);
         *((si8 *) mxGetPr(tmp_mxa)) = slice->end_time;
-        mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_END_TIME_UUTC_IDX_mat, tmp_mxa);
+        mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_SLICE_END_TIME_UUTC_IDX_mat, tmp_mxa);
         
-        // start time string
+        // slice start time string
 	STR_time_string_m12(slice->start_time, time_str, TRUE_m12, relative_days, FALSE_m12);
         tmp_mxa = mxCreateString(time_str);
-        mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_START_TIME_STRING_IDX_mat, tmp_mxa);
+        mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_SLICE_START_TIME_STRING_IDX_mat, tmp_mxa);
         
-        // end time string
+        // slice end time string
 	STR_time_string_m12(slice->end_time, time_str, TRUE_m12, relative_days, FALSE_m12);
         tmp_mxa = mxCreateString(time_str);
-        mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_END_TIME_STRING_IDX_mat, tmp_mxa);
+        mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_SLICE_END_TIME_STRING_IDX_mat, tmp_mxa);
 
         // session start time uutc
         tmp_mxa = mxCreateNumericArray(n_dims, dims, mxINT64_CLASS, mxREAL);
@@ -850,7 +868,7 @@ void    build_metadata(SESSION_m12 *sess, mxArray *mat_session)
 	
 	// copy session metadata into channels & change channel specific fields
 	n_chans = sess->number_of_time_series_channels;
-	mat_channels = mxGetFieldByNumber(mat_session, 0, SESSION_FIELDS_CHANNELS_IDX_mat);
+	mat_chans = mxGetFieldByNumber(mat_sess, 0, SESSION_FIELDS_CHANNELS_IDX_mat);
 	n_chans = sess->number_of_time_series_channels;
 	for (i = 0; i < n_chans; ++i) {
 		chan = sess->time_series_channels[i];
@@ -901,14 +919,14 @@ void    build_metadata(SESSION_m12 *sess, mxArray *mat_session)
 		tmp_mxa = mxGetFieldByNumber(mat_chan_metadata, 0, METADATA_FIELDS_NOTCH_FILTER_FREQUENCY_SETTING_IDX_mat);
 		*((sf8 *) mxGetPr(tmp_mxa)) = tmd2->notch_filter_frequency_setting;
 
-		mxSetFieldByNumber(mat_channels, i, CHANNEL_FIELDS_METADATA_IDX_mat, mat_chan_metadata);
+		mxSetFieldByNumber(mat_chans, i, CHANNEL_FIELDS_METADATA_IDX_mat, mat_chan_metadata);
 	}
 
         return;
 }
 
 
-void    build_session_records(SESSION_m12 *sess, mxArray *mat_session)
+void    build_session_records(SESSION_m12 *sess, mxArray *mat_sess)
 {
 	si4				n_segs, seg_idx;
         si8                     	i, j, k, n_items, tot_recs, n_recs;
@@ -986,7 +1004,7 @@ void    build_session_records(SESSION_m12 *sess, mxArray *mat_session)
 
         // create matlab records
         mat_records = mxCreateCellMatrix(n_recs, 1);
-        mxSetFieldByNumber(mat_session, 0, SESSION_FIELDS_RECORDS_IDX_mat, mat_records);
+        mxSetFieldByNumber(mat_sess, 0, SESSION_FIELDS_RECORDS_IDX_mat, mat_records);
         for (i = 0; i < n_recs; ++i) {
                 mat_record = fill_record(rec_ptrs[i]);
                 mxSetCell(mat_records, i, mat_record);

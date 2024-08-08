@@ -19,9 +19,9 @@
 
 
 // Prototypes
-void	mexFunction(si4 nlhs, mxArray *plhs[], si4 nrhs, const mxArray *prhs[]);
-si8	get_si8_scalar(const mxArray *mx_arr);
-si8	MED_time_for_sample(si8 sample_number, si1 *MED_directory, si1 *password);
+void		mexFunction(si4 nlhs, mxArray *plhs[], si4 nrhs, const mxArray *prhs[]);
+mxArray		*get_si8_array(const mxArray *mx_in_arr);
+mxArray		*MED_time_for_sample(mxArray *samples, si1 *MED_directory, si1 *password);
 
 
 #endif /* MED_TIME_FOR_SAMPLE_EXEC_IN */

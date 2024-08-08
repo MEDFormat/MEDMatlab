@@ -31,13 +31,9 @@
 #define SESSION_FIELDS_CONTIGUA_IDX_mat         3
 
 // Matlab Metadata Structure
-#define NUMBER_OF_METADATA_FIELDS_mat           44
+#define NUMBER_OF_METADATA_FIELDS_mat           40
 #define METADATA_FIELD_NAMES_mat { \
         "path", \
-        "start_time", \
-        "end_time", \
-        "start_time_string", \
-        "end_time_string", \
         "session_start_time", \
         "session_end_time", \
         "session_start_time_string", \
@@ -79,60 +75,58 @@
         "recording_institution" \
 }
 #define METADATA_FIELDS_PATH_IDX_mat                                    0
-#define METADATA_FIELDS_START_TIME_UUTC_IDX_mat                         1
-#define METADATA_FIELDS_END_TIME_UUTC_IDX_mat                           2
-#define METADATA_FIELDS_START_TIME_STRING_IDX_mat                       3
-#define METADATA_FIELDS_END_TIME_STRING_IDX_mat                         4
-#define METADATA_FIELDS_SESSION_START_TIME_UUTC_IDX_mat                 5
-#define METADATA_FIELDS_SESSION_END_TIME_UUTC_IDX_mat                   6
-#define METADATA_FIELDS_SESSION_START_TIME_STRING_IDX_mat               7
-#define METADATA_FIELDS_SESSION_END_TIME_STRING_IDX_mat                 8
-#define METADATA_FIELDS_ABSOLUTE_START_SAMPLE_NUMBER_IDX_mat            9
-#define METADATA_FIELDS_ABSOLUTE_END_SAMPLE_NUMBER_IDX_mat              10
-#define METADATA_FIELDS_SESSION_NAME_IDX_mat                            11
-#define METADATA_FIELDS_CHANNEL_NAME_IDX_mat                            12
-#define METADATA_FIELDS_ANONYMIZED_SUBJECT_ID_IDX_mat                 	13
-#define METADATA_FIELDS_SESSION_UID_IDX_mat                             14
-#define METADATA_FIELDS_CHANNEL_UID_IDX_mat                             15
-#define METADATA_FIELDS_SESSION_DESCRIPTION_IDX_mat                     16
-#define METADATA_FIELDS_CHANNEL_DESCRIPTION_IDX_mat                     17
-#define METADATA_FIELDS_EQUIPMENT_DESCRIPTION_IDX_mat                   18
-#define METADATA_FIELDS_ACQUISITION_CHANNEL_NUMBER_IDX_mat              19
-#define METADATA_FIELDS_REFERENCE_DESCRIPTION_IDX_mat                   20
-#define METADATA_FIELDS_SAMPLING_FREQUENCY_IDX_mat                      21
-#define METADATA_FIELDS_LOW_FREQUENCY_FILTER_SETTING_IDX_mat            22
-#define METADATA_FIELDS_HIGH_FREQUENCY_FILTER_SETTING_IDX_mat           23
-#define METADATA_FIELDS_NOTCH_FILTER_FREQUENCY_SETTING_IDX_mat          24
-#define METADATA_FIELDS_AC_LINE_FREQUENCY_IDX_mat                       25
-#define METADATA_FIELDS_AMPLITUDE_UNITS_CONVERSION_FACTOR_IDX_mat       26
-#define METADATA_FIELDS_AMPLITUDE_UNITS_DESCRIPTION_IDX_mat             27
-#define METADATA_FIELDS_TIME_BASE_UNITS_CONVERSION_FACTOR_IDX_mat       28
-#define METADATA_FIELDS_TIME_BASE_UNITS_DESCRIPTION_IDX_mat             29
-#define METADATA_SECTION_3_FIELDS_IDX_mat                               30
-#define METADATA_FIELDS_RECORDING_TIME_OFFSET_IDX_mat                   30
-#define METADATA_FIELDS_STANDARD_UTC_OFFSET_IDX_mat                     31
-#define METADATA_FIELDS_STANDARD_TIMEZONE_STRING_IDX_mat                32
-#define METADATA_FIELDS_STANDARD_TIMEZONE_ACRONYM_IDX_mat               33
-#define METADATA_SECTION_3_NO_ACCESS_FIELDS_IDX_mat			34
-#define METADATA_FIELDS_DAYLIGHT_TIMEZONE_STRING_IDX_mat                34
-#define METADATA_FIELDS_DAYLIGHT_TIMEZONE_ACRONYM_IDX_mat               35
-#define METADATA_FIELDS_SUBJECT_NAME_1_IDX_mat                          36
-#define METADATA_FIELDS_SUBJECT_NAME_2_IDX_mat                          37
-#define METADATA_FIELDS_SUBJECT_NAME_3_IDX_mat                          38
-#define METADATA_FIELDS_SUBJECT_ID_IDX_mat                              39
-#define METADATA_FIELDS_RECORDING_COUNTRY_IDX_mat                       40
-#define METADATA_FIELDS_RECORDING_TERRITORY_IDX_mat                     41
-#define METADATA_FIELDS_RECORDING_LOCALITY_IDX_mat                      42
-#define METADATA_FIELDS_RECORDING_INSTITUTION_IDX_mat                   43
+#define METADATA_FIELDS_SESSION_START_TIME_UUTC_IDX_mat                 1
+#define METADATA_FIELDS_SESSION_END_TIME_UUTC_IDX_mat                   2
+#define METADATA_FIELDS_SESSION_START_TIME_STRING_IDX_mat               3
+#define METADATA_FIELDS_SESSION_END_TIME_STRING_IDX_mat                 4
+#define METADATA_FIELDS_ABSOLUTE_START_SAMPLE_NUMBER_IDX_mat            5
+#define METADATA_FIELDS_ABSOLUTE_END_SAMPLE_NUMBER_IDX_mat              6
+#define METADATA_FIELDS_SESSION_NAME_IDX_mat                            7
+#define METADATA_FIELDS_CHANNEL_NAME_IDX_mat                            8
+#define METADATA_FIELDS_ANONYMIZED_SUBJECT_ID_IDX_mat                 	9
+#define METADATA_FIELDS_SESSION_UID_IDX_mat                             10
+#define METADATA_FIELDS_CHANNEL_UID_IDX_mat                             11
+#define METADATA_FIELDS_SESSION_DESCRIPTION_IDX_mat                     12
+#define METADATA_FIELDS_CHANNEL_DESCRIPTION_IDX_mat                     13
+#define METADATA_FIELDS_EQUIPMENT_DESCRIPTION_IDX_mat                   14
+#define METADATA_FIELDS_ACQUISITION_CHANNEL_NUMBER_IDX_mat              15
+#define METADATA_FIELDS_REFERENCE_DESCRIPTION_IDX_mat                   16
+#define METADATA_FIELDS_SAMPLING_FREQUENCY_IDX_mat                      17
+#define METADATA_FIELDS_LOW_FREQUENCY_FILTER_SETTING_IDX_mat            18
+#define METADATA_FIELDS_HIGH_FREQUENCY_FILTER_SETTING_IDX_mat           19
+#define METADATA_FIELDS_NOTCH_FILTER_FREQUENCY_SETTING_IDX_mat          20
+#define METADATA_FIELDS_AC_LINE_FREQUENCY_IDX_mat                       21
+#define METADATA_FIELDS_AMPLITUDE_UNITS_CONVERSION_FACTOR_IDX_mat       22
+#define METADATA_FIELDS_AMPLITUDE_UNITS_DESCRIPTION_IDX_mat             23
+#define METADATA_FIELDS_TIME_BASE_UNITS_CONVERSION_FACTOR_IDX_mat       24
+#define METADATA_FIELDS_TIME_BASE_UNITS_DESCRIPTION_IDX_mat             25
+#define METADATA_SECTION_3_FIELDS_IDX_mat                               26
+#define METADATA_FIELDS_RECORDING_TIME_OFFSET_IDX_mat                   26
+#define METADATA_FIELDS_STANDARD_UTC_OFFSET_IDX_mat                     27
+#define METADATA_FIELDS_STANDARD_TIMEZONE_STRING_IDX_mat                28
+#define METADATA_FIELDS_STANDARD_TIMEZONE_ACRONYM_IDX_mat               29
+#define METADATA_SECTION_3_NO_ACCESS_FIELDS_IDX_mat			30
+#define METADATA_FIELDS_DAYLIGHT_TIMEZONE_STRING_IDX_mat                30
+#define METADATA_FIELDS_DAYLIGHT_TIMEZONE_ACRONYM_IDX_mat               31
+#define METADATA_FIELDS_SUBJECT_NAME_1_IDX_mat                          32
+#define METADATA_FIELDS_SUBJECT_NAME_2_IDX_mat                          33
+#define METADATA_FIELDS_SUBJECT_NAME_3_IDX_mat                          34
+#define METADATA_FIELDS_SUBJECT_ID_IDX_mat                              35
+#define METADATA_FIELDS_RECORDING_COUNTRY_IDX_mat                       36
+#define METADATA_FIELDS_RECORDING_TERRITORY_IDX_mat                     37
+#define METADATA_FIELDS_RECORDING_LOCALITY_IDX_mat                      38
+#define METADATA_FIELDS_RECORDING_INSTITUTION_IDX_mat                   39
 
 // Matlab Channel Structure
-#define NUMBER_OF_CHANNEL_FIELDS_mat            2
+#define NUMBER_OF_CHANNEL_FIELDS_mat            3
 #define CHANNEL_FIELD_NAMES_mat { \
+	"name", \
 	"metadata", \
 	"contigua" \
 }
-#define CHANNEL_FIELDS_METADATA_IDX_mat         0
-#define CHANNEL_FIELDS_CONTIGUA_IDX_mat         1
+#define CHANNEL_FIELDS_NAME_IDX_mat         	0
+#define CHANNEL_FIELDS_METADATA_IDX_mat         1
+#define CHANNEL_FIELDS_CONTIGUA_IDX_mat         2
 
 // Matlab Contiguon Structure (contiguous region - plural "contigua")
 #define NUMBER_OF_CONTIGUON_FIELDS_mat          	6
@@ -303,6 +297,7 @@
 void            mexFunction(si4 nlhs, mxArray *plhs[], si4 nrhs, const mxArray *prhs[]);
 si8             get_si8_scalar(const mxArray *mx_arr);
 mxArray		*MED_session_stats(void *file_list, si4 n_files, TERN_m12 return_channels, TERN_m12 return_contigua, TERN_m12 return_records, si1 *password);
+void		build_channel_names(SESSION_m12 *sess, mxArray *mat_sess);
 void    	build_metadata(SESSION_m12 *sess, mxArray *mat_session, TERN_m12 return_channels);
 void		build_contigua(SESSION_m12 *sess, mxArray *mat_session, TERN_m12 return_channels);
 void            build_session_records(SESSION_m12 *sess, mxArray *mat_session);

@@ -11,17 +11,17 @@
 // Defines
 
 // Version
-#define MED_SAMPLE_FOR_TIME_VER_MAJOR		((ui1) 1)
-#define MED_SAMPLE_FOR_TIME_VER_MINOR		((ui1) 0)
+#define READ_MED_VER_MAJOR	((ui1) 1)
+#define READ_MED_VER_MINOR	((ui1) 0)
 
 // Miscellaneous
-#define MAX_CHANNELS                        	512
+#define MAX_CHANNELS		512
 
 
 // Prototypes
-void	mexFunction(si4 nlhs, mxArray *plhs[], si4 nrhs, const mxArray *prhs[]);
-si8	get_si8_scalar(const mxArray *mx_arr);
-si8	MED_sample_for_time(si8 time, si1 *MED_directory, si1 *password);
+void		mexFunction(si4 nlhs, mxArray *plhs[], si4 nrhs, const mxArray *prhs[]);
+mxArray		*get_si8_array(const mxArray *mx_in_arr);
+mxArray		*MED_sample_for_time(mxArray *times, si1 *MED_directory, si1 *password);
 
 
 #endif /* MED_SAMPLE_FOR_TIME_EXEC_IN */

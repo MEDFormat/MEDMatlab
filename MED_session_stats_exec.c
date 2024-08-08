@@ -31,7 +31,7 @@ void    mexFunction(si4 nlhs, mxArray *plhs[], si4 nrhs, const mxArray *prhs[])
 	// check for proper number of arguments
 	if (nlhs != 1)
 		mexErrMsgTxt("One output required: MED session structure\n");
-	plhs[0] = mxCreateDoubleMatrix(0, 0, mxREAL);  // set empty return value for subsequent errors
+	plhs[0] = mxCreateLogicalScalar((mxLogical) 0);  // set "false" return value for any subsequent errors
 	if (nrhs < 1 || nrhs > 5)
 		mexErrMsgTxt("One to five inputs required: session or channel name, [return_channels], [return_records], [return_contigua], [password]\n");
 
@@ -61,104 +61,103 @@ void    mexFunction(si4 nlhs, mxArray *plhs[], si4 nrhs, const mxArray *prhs[])
 		mexErrMsgTxt("'file_list' (input 1) must be a string or cell array\nStrings may include regular expressions (regex)\n");
 	}
 
-	// return channels
-	return_channels = FALSE_m12;
+	// password
+	*password = 0;
 	if (nrhs > 1) {
 		if (mxIsEmpty(prhs[1]) == 0) {
-			return_channels = UNKNOWN_m12;
 			if (mxGetClassID(prhs[1]) == mxCHAR_CLASS) {
-				mxGetString(prhs[1], temp_str, 16);
+				len = mxGetNumberOfElements(prhs[1]); // Get the length of the input string
+				if (len > (PASSWORD_BYTES_m12))  // allow full 16 bytes for password
+					mexErrMsgTxt("'password' (input 2) is too long\n");
+				else
+					mxGetString(prhs[1], password, len + 1);
+			} else {
+				mexErrMsgTxt("'password' (input 2) must be a string\n");
+			}
+		}
+	}
+	
+	// return channels
+	return_channels = FALSE_m12;
+	if (nrhs > 2) {
+		if (mxIsEmpty(prhs[2]) == 0) {
+			return_channels = UNKNOWN_m12;
+			if (mxGetClassID(prhs[2]) == mxCHAR_CLASS) {
+				mxGetString(prhs[2], temp_str, 16);
 				if (*temp_str == 't' || *temp_str == 'T' || *temp_str == 'y' || *temp_str == 'Y' || *temp_str == '1')
 					return_channels = TRUE_m12;
 				else if (*temp_str == 'f' || *temp_str == 'F' || *temp_str == 'n' || *temp_str == 'N' || *temp_str == '0')
 					return_channels = FALSE_m12;
-			} else if (mxIsLogicalScalar(prhs[1])) {
-				if (mxIsLogicalScalarTrue(prhs[1]) == 1)
+			} else if (mxIsLogicalScalar(prhs[2])) {
+				if (mxIsLogicalScalarTrue(prhs[2]) == 1)
 					return_channels = TRUE_m12;
 				else
 					return_channels = FALSE_m12;
-			} else if (mxIsScalar(prhs[1])) {
-				if (mxGetScalar(prhs[1]) == 1)
+			} else if (mxIsScalar(prhs[2])) {
+				if (mxGetScalar(prhs[2]) == 1)
 					return_channels = TRUE_m12;
 				else
 					return_channels = FALSE_m12;
 			}
 			if (return_channels == UNKNOWN_m12)
-				mexErrMsgTxt("'return_channels' (input 2) can be either true or false (default) only\n");
+				mexErrMsgTxt("'return_channels' (input 3) can be either true or false (default) only\n");
 		}
 	}
 	
 	// return contigua
 	return_contigua = FALSE_m12;
-	if (nrhs > 2) {
-		if (mxIsEmpty(prhs[2]) == 0) {
+	if (nrhs > 3) {
+		if (mxIsEmpty(prhs[3]) == 0) {
 			return_contigua = UNKNOWN_m12;
-			if (mxGetClassID(prhs[2]) == mxCHAR_CLASS) {
-				mxGetString(prhs[2], temp_str, 16);
+			if (mxGetClassID(prhs[3]) == mxCHAR_CLASS) {
+				mxGetString(prhs[3], temp_str, 16);
 				if (*temp_str == 't' || *temp_str == 'T' || *temp_str == 'y' || *temp_str == 'Y' || *temp_str == '1')
 					return_contigua = TRUE_m12;
 				else if (*temp_str == 'f' || *temp_str == 'F' || *temp_str == 'n' || *temp_str == 'N' || *temp_str == '0')
 					return_contigua = FALSE_m12;
-			} else if (mxIsLogicalScalar(prhs[2])) {
-				if (mxIsLogicalScalarTrue(prhs[2]) == 1)
+			} else if (mxIsLogicalScalar(prhs[3])) {
+				if (mxIsLogicalScalarTrue(prhs[3]) == 1)
 					return_contigua = TRUE_m12;
 				else
 					return_contigua = FALSE_m12;
-			} else if (mxIsScalar(prhs[2])) {
-				if (mxGetScalar(prhs[2]) == 1)
+			} else if (mxIsScalar(prhs[3])) {
+				if (mxGetScalar(prhs[3]) == 1)
 					return_contigua = TRUE_m12;
-				else if (mxGetScalar(prhs[2]) == 0)
+				else if (mxGetScalar(prhs[3]) == 0)
 					return_contigua = FALSE_m12;
 			}
 			if (return_contigua == UNKNOWN_m12)
-				mexErrMsgTxt("'return_contigua' (input 3) can be either true or false (default) only\n");
+				mexErrMsgTxt("'return_contigua' (input 4) can be either true or false (default) only\n");
 		}
 	}
 
 	// return records
 	return_records = FALSE_m12;
-	if (nrhs > 3) {
-		if (mxIsEmpty(prhs[3]) == 0) {
-			if (mxGetClassID(prhs[3]) == mxCHAR_CLASS) {
-				mxGetString(prhs[3], temp_str, 16);
+	if (nrhs > 4) {
+		if (mxIsEmpty(prhs[4]) == 0) {
+			return_records = UNKNOWN_m12;
+			if (mxGetClassID(prhs[4]) == mxCHAR_CLASS) {
+				mxGetString(prhs[4], temp_str, 16);
 				if (*temp_str == 't' || *temp_str == 'T' || *temp_str == 'y' || *temp_str == 'Y' || *temp_str == '1')
 					return_records = TRUE_m12;
 				else if (*temp_str == 'f' || *temp_str == 'F' || *temp_str == 'n' || *temp_str == 'N' || *temp_str == '0')
 					return_records = FALSE_m12;
-				else
-					mexErrMsgTxt("'return_records' (input 4) can be either 'true' or 'false' (default) only\n");
-			} else if (mxIsLogicalScalar(prhs[3])) {
-				if (mxIsLogicalScalarTrue(prhs[3]) == 1)
+			} else if (mxIsLogicalScalar(prhs[4])) {
+				if (mxIsLogicalScalarTrue(prhs[4]) == 1)
 					return_records = TRUE_m12;
 				else
 					return_records = FALSE_m12;
-			} else if (mxIsScalar(prhs[3])) {
-				if (mxGetScalar(prhs[3]) == 1)
+			} else if (mxIsScalar(prhs[4])) {
+				if (mxGetScalar(prhs[4]) == 1)
 					return_records = TRUE_m12;
-				else if (mxGetScalar(prhs[3]) == 0)
+				else if (mxGetScalar(prhs[4]) == 0)
 					return_records = FALSE_m12;
 			}
-			if (return_contigua == UNKNOWN_m12)
-				mexErrMsgTxt("'return_records' (input 4) can be either true or false (default) only\n");
+			if (return_records == UNKNOWN_m12)
+				mexErrMsgTxt("'return_records' (input 5) can be either true or false (default) only\n");
 		}
 	}
 		
-        // password
-        *password = 0;
-        if (nrhs > 4) {
-                if (mxIsEmpty(prhs[4]) == 0) {
-                        if (mxGetClassID(prhs[4]) == mxCHAR_CLASS) {
-                                len = mxGetNumberOfElements(prhs[4]); // Get the length of the input string
-                                if (len > (PASSWORD_BYTES_m12))  // allow full 16 bytes for password
-					mexErrMsgTxt("'password' (input 5) is too long\n");
-                                else
-                                        mxGetString(prhs[4], password, len + 1);
-                        } else {
-				mexErrMsgTxt("'password' (input 5) must be a string\n");
-                        }
-                }
-        }
-        
 	// initialize MED library
 	G_initialize_medlib_m12(FALSE_m12, FALSE_m12);
                 
@@ -254,6 +253,9 @@ mxArray     *MED_session_stats(void *file_list, si4 n_files, TERN_m12 return_cha
 		n_channels = sess->number_of_time_series_channels;
 		mat_channels = mxCreateStructMatrix(n_channels, 1, n_mat_channel_fields, mat_channel_field_names);
 		mxSetFieldByNumber(mat_session, 0, SESSION_FIELDS_CHANNELS_IDX_mat, mat_channels);
+		
+		// build channel names (duplicated in metadata, but convenient for viewing
+		build_channel_names(sess, mat_session);
 	}
 
 	// Build metadata
@@ -271,6 +273,30 @@ mxArray     *MED_session_stats(void *file_list, si4 n_files, TERN_m12 return_cha
 	G_free_session_m12(sess, TRUE_m12);
 
         return(mat_session);
+}
+
+
+void	build_channel_names(SESSION_m12 *sess, mxArray *mat_sess)
+{
+	si8                             i, n_chans;
+	CHANNEL_m12                     *chan;
+	FILE_PROCESSING_STRUCT_m12	*metadata_fps;
+	UNIVERSAL_HEADER_m12		*uh;
+	mxArray                         *tmp_mxa, *mat_chans;
+	
+	
+	// create name cell strings array
+	n_chans = sess->number_of_time_series_channels;
+	mat_chans = mxGetFieldByNumber(mat_sess, 0, SESSION_FIELDS_CHANNELS_IDX_mat);
+	for (i = 0; i < n_chans; ++i) {
+		chan = sess->time_series_channels[i];
+		metadata_fps = chan->segments[0]->metadata_fps;
+		uh = metadata_fps->universal_header;
+		tmp_mxa = mxCreateString(uh->channel_name);
+		mxSetFieldByNumber(mat_chans, i, CHANNEL_FIELDS_NAME_IDX_mat, tmp_mxa);
+	}
+	
+	return;
 }
 
 
@@ -386,7 +412,6 @@ void    build_metadata(SESSION_m12 *sess, mxArray *mat_session, TERN_m12 return_
 	
 	slice = &sess->time_slice;
 	seg_idx = G_get_segment_index_m12(slice->start_segment_number);
-//	metadata_fps = sess->time_series_metadata_fps;  // ephemeral
 	metadata_fps = globals_m12->reference_channel->segments[seg_idx]->metadata_fps;  // reference channel first segment (more efficient)
 	uh = metadata_fps->universal_header;
 	if (uh->type_code != TIME_SERIES_METADATA_FILE_TYPE_CODE_m12)
@@ -405,26 +430,6 @@ void    build_metadata(SESSION_m12 *sess, mxArray *mat_session, TERN_m12 return_
 	// path
 	tmp_mxa = mxCreateString(sess->path);
 	mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_PATH_IDX_mat, tmp_mxa);
-
-	// start time uutc
-	tmp_mxa = mxCreateNumericArray(n_dims, dims, mxINT64_CLASS, mxREAL);
-	*((si8 *) mxGetPr(tmp_mxa)) = slice->start_time;
-	mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_START_TIME_UUTC_IDX_mat, tmp_mxa);
-
-	// end time uutc
-	tmp_mxa = mxCreateNumericArray(n_dims, dims, mxINT64_CLASS, mxREAL);
-	*((si8 *) mxGetPr(tmp_mxa)) = slice->end_time;
-	mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_END_TIME_UUTC_IDX_mat, tmp_mxa);
-	
-	// start time string
-	STR_time_string_m12(slice->start_time, time_str, TRUE_m12, relative_days, FALSE_m12);
-	tmp_mxa = mxCreateString(time_str);
-	mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_START_TIME_STRING_IDX_mat, tmp_mxa);
-	
-	// end time string
-	STR_time_string_m12(slice->end_time, time_str, TRUE_m12, relative_days, FALSE_m12);
-	tmp_mxa = mxCreateString(time_str);
-	mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_END_TIME_STRING_IDX_mat, tmp_mxa);
 
 	// session start time uutc
 	tmp_mxa = mxCreateNumericArray(n_dims, dims, mxINT64_CLASS, mxREAL);

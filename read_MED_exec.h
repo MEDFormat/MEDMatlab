@@ -1,31 +1,27 @@
 
 // Written by Matt Stead
-// Copyright Dark Horse Neuro Inc, 2020
+// Copyright Dark Horse Neuro Inc, 2024
 
 #ifndef READ_MED_EXEC_IN
 #define READ_MED_EXEC_IN
 
-// Define Persistent (before medlib_m12.h)
-#define MATLAB_PERSISTENT_m12
-
 // Includes
 #include "medlib_m12.h"
 
-// Other Defines
-
-// Version
-#define LS_READ_MED_VER_MAJOR			((ui1) 1)
-#define LS_READ_MED_VER_MINOR			((ui1) 1)
+// Version (Read_MED package including read_MED)
+#define READ_MED_VER_MAJOR	((ui1) 1)
+#define READ_MED_VER_MINOR	((ui1) 1)
 
 // Miscellaneous
-#define MAX_CHANNELS                        	512
+#define MAX_CHANNELS		512
 
 // Persistent Behaviors
-#define PERSIST_CLOSE		((ui1) 1)	// close & free any open session & return
-#define PERSIST_OPEN		((ui1) 2)	// close & free any open session, open new session & return
+#define PERSIST_OPEN		((ui1) 1)	// close & free any open session, open new session, & return
+#define PERSIST_CLOSE		((ui1) 2)	// close & free any open session & return
 #define PERSIST_READ		((ui1) 4)	// read current session (& open if none exists), replace existing parameters with non-empty passed parameters
-#define PERSIST_READ_NEW	(PERSIST_OPEN | PERSIST_READ)	// close any open session, open & read new session
-#define PERSIST_READ_CLOSE	(PERSIST_CLOSE | PERSIST_READ)	// close any open session, open & read new session (default behavior)
+#define PERSIST_READ_NEW	(PERSIST_READ | PERSIST_OPEN)	// close & free any open session, open & read new session, leave open after read
+#define PERSIST_READ_CLOSE	(PERSIST_READ | PERSIST_CLOSE)	// close & free any open session, open & read new session, close after read
+#define PERSIST_NONE		PERSIST_READ_CLOSE	// default
 
 // Matlab Session Structure
 #define NUMBER_OF_SESSION_FIELDS_mat            4
@@ -44,10 +40,10 @@
 #define NUMBER_OF_METADATA_FIELDS_mat           45
 #define METADATA_FIELD_NAMES_mat { \
         "path", \
-        "start_time", \
-        "end_time", \
-        "start_time_string", \
-        "end_time_string", \
+        "slice_start_time", \
+        "slice_end_time", \
+        "slice_start_time_string", \
+        "slice_end_time_string", \
         "session_start_time", \
         "session_end_time", \
         "session_start_time_string", \
@@ -90,10 +86,10 @@
         "recording_institution" \
 }
 #define METADATA_FIELDS_PATH_IDX_mat                                    0
-#define METADATA_FIELDS_START_TIME_UUTC_IDX_mat                         1
-#define METADATA_FIELDS_END_TIME_UUTC_IDX_mat                           2
-#define METADATA_FIELDS_START_TIME_STRING_IDX_mat                       3
-#define METADATA_FIELDS_END_TIME_STRING_IDX_mat                         4
+#define METADATA_FIELDS_SLICE_START_TIME_UUTC_IDX_mat			1
+#define METADATA_FIELDS_SLICE_END_TIME_UUTC_IDX_mat			2
+#define METADATA_FIELDS_SLICE_START_TIME_STRING_IDX_mat			3
+#define METADATA_FIELDS_SLICE_END_TIME_STRING_IDX_mat			4
 #define METADATA_FIELDS_SESSION_START_TIME_UUTC_IDX_mat                 5
 #define METADATA_FIELDS_SESSION_END_TIME_UUTC_IDX_mat                   6
 #define METADATA_FIELDS_SESSION_START_TIME_STRING_IDX_mat               7
@@ -138,15 +134,17 @@
 #define METADATA_FIELDS_RECORDING_INSTITUTION_IDX_mat                   44
 
 // Matlab Channel Structure
-#define NUMBER_OF_CHANNEL_FIELDS_mat            3
+#define NUMBER_OF_CHANNEL_FIELDS_mat            4
 #define CHANNEL_FIELD_NAMES_mat { \
+	"name", \
         "metadata", \
         "data", \
         "contigua" \
 }
-#define CHANNEL_FIELDS_METADATA_IDX_mat         0
-#define CHANNEL_FIELDS_DATA_IDX_mat             1
-#define CHANNEL_FIELDS_CONTIGUA_IDX_mat         2
+#define CHANNEL_FIELDS_NAME_IDX_mat         	0
+#define CHANNEL_FIELDS_METADATA_IDX_mat         1
+#define CHANNEL_FIELDS_DATA_IDX_mat             2
+#define CHANNEL_FIELDS_CONTIGUA_IDX_mat         3
 
 // Matlab Contiguon Structure (contiguous region - plural "contigua")
 #define NUMBER_OF_CONTIGUON_FIELDS_mat          	6
@@ -314,14 +312,15 @@
 
 
 // Prototypes
+void		mexExitFunction(void);
 void            mexFunction(si4 nlhs, mxArray *plhs[], si4 nrhs, const mxArray *prhs[]);
 si8             get_si8_scalar(const mxArray *mx_arr);
 mxArray     	*read_MED(void *file_list, si4 n_files, si8 start_time, si8 end_time, si8 start_idx, si8 end_idx, si1 *password, si1 *ref_chan, TERN_m12 samples_as_singles, ui1 persist_mode);
+void		build_channel_names(SESSION_m12 *sess, mxArray *mat_sess);
 void    	build_metadata(SESSION_m12 *sess, mxArray *mat_session);
 void		build_contigua(SESSION_m12 *sess, mxArray *mat_session);
 void            build_session_records(SESSION_m12 *sess, mxArray *mat_session);
 mxArray         *fill_record(RECORD_HEADER_m12 *rh);
-void		mexExitFunction(void);
 si4             rec_compare(const void *a, const void *b);
 
 
