@@ -450,7 +450,7 @@ function view_MED(varargin)
         stop_filters = {'ticd'};
         [chan_list, sess_dir] = directory_chooser(filters, DEFAULT_DATA_DIRECTORY, stop_filters);
         if (isempty(chan_list))
-            errordlg('No MED files selected', 'View MED');
+            errordlg('No MED data selected', 'View MED');
             return;
         end
         n_chans = numel(chan_list);
@@ -460,7 +460,7 @@ function view_MED(varargin)
                 sess_dir = [sess_dir DIR_DELIM char(chan_list(1))];
                 dir_list = dir([sess_dir DIR_DELIM '*.ticd']);
                 if (isempty(dir_list))
-                    errordlg('No MED files selected session', 'View MED');
+                    errordlg('No MED data in selected session', 'View MED');
                     return;
                 end
                 n_chans = numel(dir_list);
@@ -485,10 +485,10 @@ function view_MED(varargin)
         chan_list = cell(n_chans, 1);
         for ii = 1:n_chans
             chan_paths{ii} = sess.channels(ii).metadata.path;
-            chan_list{ii} = sess.channels(ii).metadata.channel_name;
+            chan_list{ii} = sess.channels(ii).name;
         end
-        page_start = sess.metadata.start_time;
-        page_end = sess.metadata.end_time;
+        page_start = sess.metadata.slice_start_time;
+        page_end = sess.metadata.slice_end_time;
         wind_usecs = (page_end - page_start) + 1;
         clear sess;
     end
@@ -609,22 +609,22 @@ function view_MED(varargin)
             % get new data
             set_page_limits();
             screen_sf = (full_page_width * double(1e6)) / double(wind_usecs);
-            raw_page = matrix_MED_exec(chan_paths, page_start, page_end, full_page_width, password, antialias_flag, baseline_correct_flag, ranges_flag, 4);  % 'read' mode
+            raw_page = matrix_MED_exec(chan_paths, full_page_width, page_start, page_end, password, antialias_flag, baseline_correct_flag, ranges_flag, 4);  % 'read' mode
             if (isempty(raw_page))
                 errordlg('Error reading data', 'View MED');
                 return;
             end
 
             % get returned page times (may differ from requested)
-            page_start = raw_page.start_time;
-            page_end = raw_page.end_time;
+            page_start = raw_page.slice_start_time;
+            page_end = raw_page.slice_end_time;
 
             % set time strings
             curr_usec = double(page_start - sess_start);
             set(current_time_textbox, 'String', num2str(double(curr_usec) / 1e6, '%0.6f'));
             if calendar_time_flag == true
-                set(axis_start_time_string, 'String', raw_page.start_time_string);
-                set(axis_end_time_string, 'String', raw_page.end_time_string);
+                set(axis_start_time_string, 'String', raw_page.slice_start_time_string);
+                set(axis_end_time_string, 'String', raw_page.slice_end_time_string);
             elseif uUTC_flag == true
                 set(axis_start_time_string, 'String', ['start µUTC: ' num2str(page_start + recording_time_offset)]);
                 set(axis_end_time_string, 'String', ['end µUTC: ' num2str(page_end + recording_time_offset)]);
@@ -1563,6 +1563,7 @@ function view_MED(varargin)
         chan_paths = chan_paths(1:n_chans);
         chan_list = chan_list(1:n_chans);
 
+        [~] = matrix_MED_exec(chan_paths, full_page_width, page_start, page_end, password, [], [], [], 2);  % close matrix to reset channel dimension
         plot_handles = [];
         if (autoscale_flag == false)  % rescale plots for new trace set
             set(autoscale_button, 'String', 'Autoscaling is On');
@@ -1590,7 +1591,7 @@ function view_MED(varargin)
                 figure_close_callback();
                 return;
             else
-                errordlg('No MED files selected', 'View MED');
+                errordlg('No MED data selected', 'View MED');
                 return;
             end
         end
@@ -1618,9 +1619,9 @@ function view_MED(varargin)
         chan_list = cell(n_chans, 1);
         for i = 1:n_chans
             chan_paths{i} = sess.channels(i).metadata.path;
-            chan_list{i} = sess.channels(i).metadata.channel_name;
+            chan_list{i} = sess.channels(i).name;
         end
-        page_start = sess.metadata.start_time;
+        page_start = sess.metadata.slice_start_time;
         page_end = (page_start + wind_usecs) - 1;
         clear sess;
     
@@ -1791,24 +1792,24 @@ function view_MED(varargin)
         elseif oUTC_flag == true   % oUTC time => calendar time
             uUTC_flag = false; oUTC_flag = false;
             calendar_time_flag = true;
-            set(axis_start_time_string, 'String', raw_page.start_time_string);
-            set(axis_end_time_string, 'String', raw_page.end_time_string);
+            set(axis_start_time_string, 'String', raw_page.slice_start_time_string);
+            set(axis_end_time_string, 'String', raw_page.slice_end_time_string);
         end
         
         % copy data to clipboard
         if (src == axis_start_time_string)  % copy start times
             page_start_str = num2str(curr_usec / 1e6,  '%0.6f');
             if recording_time_offset ~= 0  % include µUTC
-                clipboard('copy', ['Page Start Time:' newline raw_page.start_time_string newline 'µUTC: ' num2str(page_start + recording_time_offset) newline 'oUTC: ' num2str(page_start) newline 'Relative (s): ' page_start_str newline]);
+                clipboard('copy', ['Page Start Time:' newline raw_page.slice_start_time_string newline 'µUTC: ' num2str(page_start + recording_time_offset) newline 'oUTC: ' num2str(page_start) newline 'Relative (s): ' page_start_str newline]);
             else  % don't include µUTC
-                clipboard('copy', ['Page Start Time:' newline raw_page.start_time_string newline 'oUTC: ' num2str(page_start) newline 'Relative (s): ' page_start_str newline]);
+                clipboard('copy', ['Page Start Time:' newline raw_page.slice_start_time_string newline 'oUTC: ' num2str(page_start) newline 'Relative (s): ' page_start_str newline]);
             end        
         else    % copy end times
             page_end_str = num2str((curr_usec + wind_usecs) / 1e6,  '%0.6f');
             if recording_time_offset ~= 0  % include µUTC
-                clipboard('copy', ['Page End Time:' newline raw_page.end_time_string newline 'µUTC: ' num2str(page_end + recording_time_offset) newline 'oUTC: ' num2str(page_end) newline 'Relative (s): ' page_end_str newline]);
+                clipboard('copy', ['Page End Time:' newline raw_page.slice_end_time_string newline 'µUTC: ' num2str(page_end + recording_time_offset) newline 'oUTC: ' num2str(page_end) newline 'Relative (s): ' page_end_str newline]);
             else  % don't include µUTC
-                clipboard('copy', ['Page End Time:' newline raw_page.end_time_string newline 'oUTC: ' num2str(page_end) newline 'Relative (s): ' page_end_str newline]);
+                clipboard('copy', ['Page End Time:' newline raw_page.slice_end_time_string newline 'oUTC: ' num2str(page_end) newline 'Relative (s): ' page_end_str newline]);
             end
         end
 
@@ -1896,9 +1897,11 @@ function view_MED(varargin)
         flag_screen_top = flag_screen_top + data_ax_height;
 
         rec_type = raw_page.records{rec_idx}.type_string;
+        num_start_time_string = num2str(raw_page.records{rec_idx}.start_time);
         blurb = [ 'Type: ' rec_type ' v' raw_page.records{rec_idx}.version_string newline ...
             'Encryption: ' raw_page.records{rec_idx}.encryption_string newline ...
-            'Start Time: ' raw_page.records{rec_idx}.start_time_string newline];
+            'Start Time: ' raw_page.records{rec_idx}.start_time_string newline ...
+            'Start Time (oUTC): ' num_start_time_string newline];
 
         switch rec_type
             case 'NlxP'
@@ -1907,14 +1910,17 @@ function view_MED(varargin)
             case 'Note'
                 title = 'Annotation Record';
                 if strcmp(raw_page.records{rec_idx}.version_string, '1.001')
-                    blurb = [blurb 'End Time: ' raw_page.records{rec_idx}.end_time_string newline];
-                end
+                    blurb = [blurb 'End Time: ' raw_page.records{rec_idx}.end_time_string newline ...
+                        'End Time (oUTC): ' num2str(raw_page.records{rec_idx}.end_time) newline];
+               end
                 blurb = [blurb 'Text: ' raw_page.records{rec_idx}.text];
             case 'Epoc'
                 duration = double((raw_page.records{rec_idx}.end_time - raw_page.records{rec_idx}.start_time) + 1) / double(1e6);
                 duration_string = [num2str(duration) ' (sec)'];
                 title = 'Sleep Epoch Record';
+                num_end_time_string = num2str(raw_page.records{rec_idx}.end_time);
                 blurb = [blurb 'End Time: ' raw_page.records{rec_idx}.end_time_string newline ...
+                    'End Time (oUTC): ' num_end_time_string newline ...
                     'Duration: ' duration_string newline ...
                     'Stage: ' raw_page.records{rec_idx}.stage_string newline ...
                     'Scorer ID: ' raw_page.records{rec_idx}.scorer_id newline];          
@@ -1944,7 +1950,9 @@ function view_MED(varargin)
                 else
                     segment_UID_string = [];
                 end
+                num_end_time_string = num2str(raw_page.records{rec_idx}.end_time);
                 blurb = [blurb 'End Time: ' raw_page.records{rec_idx}.end_time_string newline ...
+                    'End Time (oUTC): ' num_end_time_string newline ...
                     'Start Sample Number: ' start_sample_string newline ...
                     'End Sample Number: ' end_sample_string newline ...
                     'Segment Number: ' segment_number_string newline];
@@ -2503,8 +2511,8 @@ function view_MED(varargin)
 
         % Dialog Button Callbacks (nested)
         function d_ok_btnCallback(~, ~)
-            zoom_chans = d_chan_chkbox.Value;
-            zoom_time = d_time_chkbox.Value;
+            zoom_chans = logical(d_chan_chkbox.Value);
+            zoom_time = logical(d_time_chkbox.Value);
             if (new_page_secs > WAIT_POINTER_DELAY)
                 set(d, 'Pointer', 'watch');
                 drawnow;
@@ -2533,18 +2541,19 @@ function view_MED(varargin)
             end
         end
         if (j == 0 || j == n_chans)
-            zoom_chans = 0;
+            zoom_chans = false;
         end
         delete(r);
 
-        if (zoom_chans == 0 && zoom_time == 0)     
+        if (zoom_chans == false && zoom_time == false)     
             set(fig, 'Pointer', 'arrow');
             set_movement_focus();
             return;
         end
 
         % Update channel lists & plotting variables
-        if (zoom_chans == 1)
+        if (zoom_chans == true)
+            [~] = matrix_MED_exec(chan_paths, full_page_width, page_start, page_end, password, [], [], [], 2);  % close matrix to reset channel dimension
             j = 0;
             for i = 1:n_chans
                 if (sel_chans(i))
@@ -2567,7 +2576,7 @@ function view_MED(varargin)
         end
 
         % Update page limits
-        if (zoom_time == 1)
+        if (zoom_time == true)
             page_duration = double(page_end - page_start) + 1;
             box_left = l;
             box_right = (l + dx) - 1;
@@ -2582,7 +2591,7 @@ function view_MED(varargin)
         plot_page(true);
 
         % Make channel labels
-        if (zoom_chans == 1)
+        if (zoom_chans == true)
             selected_labels = [];
             create_labels();
             draw_labels();
@@ -2602,7 +2611,7 @@ function view_MED(varargin)
 
 	% Figure Close Callback
     function figure_close_callback(~, ~)
-        [~] = matrix_MED_exec(chan_paths, page_start, page_end, full_page_width, password, antialias_flag, baseline_correct_flag, ranges_flag, 1);  % 'close' mode
+        [~] = matrix_MED_exec(chan_paths, full_page_width, page_start, page_end, password, [], [], [], 2);  % 'close' mode
         delete(fig);
     end
 

@@ -1,11 +1,12 @@
-function matrix = matrix_MED(chan_list, start_time, end_time, n_out_samps, varargin)
+
+function matrix = matrix_MED(chan_list, n_out_samps, varargin)
 
     %
-    %   matrix_MED() requires 4 to 9 inputs: 
+    %   matrix_MED() requires 2 to 9 inputs: 
     %   1)  chan_list
-    %   2)  start_time
-    %   3)  end_time
-    %   4)  n_out_samps
+    %   2)  n_out_samps
+    %   3)  [start_time]
+    %   4)  [end_time]
     %   5)  [password]
     %   6)  [antialias ([true] / false)]
     %   7)  [detrend (true / [false])]
@@ -13,7 +14,7 @@ function matrix = matrix_MED(chan_list, start_time, end_time, n_out_samps, varar
     %   9)  [persistence_mode (string or code: options shown below)] 
     %
     %   Prototype:
-    %   matrix_struct = matrix_MED(chan_list, start_time, end_time, n_out_samps, [password], [antialias], [detrend], [trace_ranges], [persistence_mode]);
+    %   matrix_struct = matrix_MED(chan_list, n_out_samps, [start_time], [end_time], [password], [antialias], [detrend], [trace_ranges], [persistence_mode]);
     %
     %   matrix_MED() returns a single Matlab matrix structure
     %
@@ -29,13 +30,13 @@ function matrix = matrix_MED(chan_list, start_time, end_time, n_out_samps, varar
     %   detrend:  if empty/absent, defaults to false (options: true, false)
     %   trace_ranges:  if empty/absent, defaults to false (options: true, false)
     %   persistence_mode:  if empty/absent, defaults to 'none' (0)
-    %   Options:
+    %   Persistence Modes:
     %       'none' (0):	 single read behavior (default: this is identical to 'read close' below)
-    %		'close' (1):  close & free any open session & return
-    %       'open' (2):	 close & free any open session, open new session, & return
-    %       'read' (4)	read current session (& open if none exists), replace existing parameters with non-empty passed parameters
-    %       'read close' (5):  close any open session, open & read new session, close session & return
-    %       'read new' (6):	 close any open session, open & read new session
+    %       'open' (1):	 close & free any open session, open new session, & return
+    %		'close' (2):  close & free any open session & return
+    %       'read' (4):	read current session (& open if none exists), replace existing parameters with non-empty passed parameters
+    %       'read new' (5):	 close any open session, open & read new session
+    %       'read close' (6):  close any open session, open & read new session, close session & return
     %
     %   In MED, times are preferable to indices as they are independent of sampling frequencies
     %       a) times are natively in offset µUTC (oUTC), but unoffset times may be used
@@ -43,62 +44,145 @@ function matrix = matrix_MED(chan_list, start_time, end_time, n_out_samps, varar
     %
     %   Copyright Dark Horse Neuro, 2021
 
-    if nargin < 4 || nargin > 9 || nargout ~=  1
+    
+    % Enter DEFAULT_PASSWORD here for convenience, if doing so does not violate your privacy requirements
+    DEFAULT_PASSWORD = [];  % put in single quotes to make it char array
+
+    matrix = false;  % failure return value
+
+    if nargin < 2 || nargin > 9 || nargout ~=  1
         help matrix_MED;
         return;
     end
-   
-    %   Enter DEFAULT_PASSWORD here for convenience, if doing does not violate your privacy requirements
-    DEFAULT_PASSWORD = 'L2_password';  % default for example datasets
+
+    % chan_list
+    if ischar(chan_list) == false
+        if isstring(chan_list)
+            chan_list = char(chan_list);
+        elseif iscell(chan_list)
+            for i = 1:numel(chan_list)
+                if ischar(chan_list{i}) == false
+                    if isstring(chan_list{i})
+                        chan_list{i} = char(chan_list{i});
+                    else
+                        help matrix_MED;
+                        return;
+                   end
+                end
+            end
+        else
+            help matrix_MED;
+            return;
+        end
+    end
+
+    % start_time
+    if nargin >= 3
+        start_time = varargin{1};
+        if isscalar(start_time) == false
+            if isempty(start_time) == false
+                if ischar(start_time) == false
+                    if isstring(start_time)  % mex functions only take strings as char arrays
+                        start_time = char(start_time);
+                    else
+                        help matrix_MED;
+                        return;
+                    end
+                end
+            end
+        end
+    else
+        start_time = [];
+    end
+
+    % end_time
+    if nargin >= 4
+        end_time = varargin{2};
+        if isscalar(end_time) == false
+            if isempty(end_time) == false
+                if ischar(end_time) == false
+                    if isstring(end_time)  % mex functions only take strings as char arrays
+                        end_time = char(end_time);
+                    else
+                        help matrix_MED;
+                        return;
+                    end
+                end
+            end
+        end
+    else
+        end_time = [];
+    end
+
+    % password
     if nargin >= 5
-        password = varargin{1};
+        password = varargin{3};
+        if isempty(password) == false
+            if ischar(password) == false
+                if isstring(password)  % mex functions only take strings as char arrays
+                    password = char(password);
+                else
+                    help matrix_MED;
+                    return;
+                end
+            end
+        end
     else
         password = DEFAULT_PASSWORD;
     end
-    if isstring(password)
-        password = char(password);
-    end
 
+    % antialias
     if nargin >= 6
-        antialias = varargin{2};
-        if isstring(antialias)  % mex functions take strings as char arrays
+        antialias = varargin{4};
+        if isstring(antialias)  % mex functions only take strings as char arrays
             antialias = char(antialias);
         end
     else
         antialias = [];
     end
 
+    % detrend
     if nargin >= 7
-        detrend = varargin{3};
-        if isstring(detrend)  % mex functions take strings as char arrays
+        detrend = varargin{5};
+        if isstring(detrend)  % mex functions only take strings as char arrays
             detrend = char(detrend);
         end
     else
         detrend = [];
     end
 
+    % trace_ranges
     if nargin >= 8
-        trace_ranges = varargin{4};
-        if isstring(trace_ranges)  % mex functions take strings as char arrays
+        trace_ranges = varargin{6};
+        if isstring(trace_ranges)  % mex functions only take strings as char arrays
             trace_ranges = char(trace_ranges);
         end
     else
         trace_ranges = [];
     end
 
+    % persistence_mode
     if nargin >= 9
-        persistence_mode = varargin{5};
-        if isstring(persistence_mode)
-            persistence_mode = char(persistence_mode);
+        persistence_mode = varargin{7};
+        if isempty(persistence_mode) == false
+            if ischar(persistence_mode) == false
+                if isstring(persistence_mode)
+                    persistence_mode = char(persistence_mode);
+                elseif isscalar(persistence_mode) == false
+                    help matrix_MED;
+                    return;
+                end
+            end
         end
     else
         persistence_mode = [];
     end
 
+    % mex function
     try
         chan_list = get_full_paths(chan_list);
-        matrix = matrix_MED_exec(chan_list, start_time, end_time, n_out_samps, password, antialias, detrend, trace_ranges, persistence_mode);
-        if isa(matrix, 'logical')
+        matrix = matrix_MED_exec(chan_list, n_out_samps, start_time, end_time, password, antialias, detrend, trace_ranges, persistence_mode);
+        if islogical(matrix)  % can be true, false, or structure
             if matrix == false
                 errordlg('matrix_MED() error', 'Read MED');
             end
@@ -120,8 +204,8 @@ function matrix = matrix_MED(chan_list, start_time, end_time, n_out_samps, varar
                 msg = ['Added ', RESOURCES, ' to your search path.' newline];
                 beep
                 fprintf(2, '%s', msg);  % 2 == stderr, so red in command window
-                matrix = matrix_MED_exec(chan_list, start_time, end_time, n_out_samps, password, antialias, detrend, trace_ranges, persistence_mode);
-                if isa(matrix, 'logical')
+                matrix = matrix_MED_exec(chan_list, n_out_samps, start_time, end_time, password, antialias, detrend, trace_ranges, persistence_mode);
+                if islogical(matrix)  % can be true, false, or structure
                     if matrix == false
                         errordlg('matrix_MED() error', 'Read MED');
                     end

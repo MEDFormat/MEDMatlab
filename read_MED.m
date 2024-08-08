@@ -1,3 +1,4 @@
+
 function session = read_MED(file_list, varargin)
 
     %
@@ -20,12 +21,13 @@ function session = read_MED(file_list, varargin)
     %   indices_reference_channel:  if empty/absent, and necessary, defaults to first channel in set
     %   samples_as_singles:  if empty/absent, defaults to false (options: true, false)
     %   persistence_mode: (string or code)
+    %   Persistence Modes:
     %       'none' (0):	 single read behavior (default: this is identical to 'read close' below)
-    %		'close' (1):  close & free any open session & return
-    %       'open' (2):	 close & free any open session, open new session, & return
+    %       'open' (1):	 close & free any open session, open new session, & return
+    %		'close' (2):  close & free any open session & return
     %       'read' (4)	read current session (& open if none exists), replace existing parameters with non-empty passed parameters
-    %       'read close' (5):  close any open session, open & read new session, close session & return
-    %       'read new' (6):	 close any open session, open & read new session
+    %       'read new' (5):	 close any open session, open & read new session
+    %       'read close' (6):  close any open session, open & read new session, close session & return
     %
     %   If samples_as_singles is set to 'true', sample values are returned as singles (32-bit floating 
     %   point numbers), rather than doubles (64-bit floating point numbers, the Matlab default type).
@@ -47,91 +49,179 @@ function session = read_MED(file_list, varargin)
     %   Copyright Dark Horse Neuro, 2021
 
 
+    % Enter DEFAULT_PASSWORD here for convenience, if doing so does not violate your privacy requirements
+    DEFAULT_PASSWORD = [];  % put in single quotes to make it char array
+
+    session = false;  % failure return value
+
     if nargin == 0 || nargin > 9 || nargout ~=  1
         help read_MED;
         return;
     end
+
+    % file_list
+    if ischar(file_list) == false
+        if isstring(file_list)
+            file_list = char(file_list);
+        elseif iscell(file_list)
+            for i = 1:numel(file_list)
+                if ischar(file_list{i}) == false
+                    if isstring(file_list{i})
+                        file_list{i} = char(file_list{i});
+                    else
+                        help read_MED;
+                        return;
+                   end
+                end
+            end
+        else
+            help read_MED;
+            return;
+        end
+    end
     
+    % start_time
     if nargin > 1
         start_time = varargin{1};
-        if isstring(start_time)  % mex functions take strings as char arrays
-            start_time = char(start_time);
+        if isscalar(start_time) == false
+            if isempty(start_time) == false
+                if ischar(start_time) == false
+                    if isstring(start_time)  % mex functions only take strings as char arrays
+                        start_time = char(start_time);
+                    else
+                        help read_MED;
+                        return;
+                    end
+                end
+            end
         end
     else
         start_time = [];
     end
   
+    % end_time
     if nargin > 2
         end_time = varargin{2};
-        if isstring(end_time)  % mex functions take strings as char arrays
-            end_time = char(end_time);
+        if isscalar(end_time) == false
+            if isempty(end_time) == false
+                if ischar(end_time) == false
+                    if isstring(end_time)  % mex functions only take strings as char arrays
+                        end_time = char(end_time);
+                    else
+                        help read_MED;
+                        return;
+                    end
+                end
+            end
         end
     else
         end_time = [];
     end
 
+    % start_index
     if nargin > 3
         start_index = varargin{3};
-        if isstring(start_index)  % mex functions take strings as char arrays
-            start_index = char(start_index);
+        if isscalar(start_index) == false
+            if isempty(start_index) == false
+                if ischar(start_index) == false
+                    if isstring(start_index)  % mex functions only take strings as char arrays
+                        start_index = char(start_index);
+                    else
+                        help read_MED;
+                        return;
+                    end
+                end
+            end
         end
     else
         start_index = [];
     end
   
+    % end_index
     if nargin > 4
         end_index = varargin{4};
-        if isstring(end_index)  % mex functions take strings as char arrays
-            end_index = char(end_index);
+        if isscalar(end_index) == false
+            if isempty(end_index) == false
+                if ischar(end_index) == false
+                    if isstring(end_index)  % mex functions only take strings as char arrays
+                        end_index = char(end_index);
+                    else
+                        help read_MED;
+                        return;
+                    end
+                end
+            end
         end
     else
         end_index = [];
     end
 
-    %   Enter DEFAULT_PASSWORD here for convenience, if doing so does not violate your privacy requirements
-    DEFAULT_PASSWORD = [];
+    % password
     if nargin > 5
         password = varargin{5};
+        if isempty(password) == false
+            if ischar(password) == false
+                if isstring(password)  % mex functions only take strings as char arrays
+                    password = char(password);
+                else
+                    help read_MED;
+                    return;
+                end
+            end
+        end
     else
         password = DEFAULT_PASSWORD;
     end
-    if isstring(password)  % mex functions take strings as char arrays
-        password = char(password);
-    end
 
+    % reference_channel
     if nargin > 6
         reference_channel = varargin{6};
-        if isstring(reference_channel)  % mex functions take strings as char arrays
-            reference_channel = char(reference_channel);
+        if isempty(reference_channel) == false
+            if isstring(reference_channel)  % mex functions only take strings as char arrays
+                reference_channel = char(reference_channel);
+            else
+                help read_MED;
+                return;
+            end
         end
     else
         reference_channel = [];
     end
 
+    % samples_as_singles
     if nargin > 7
         samples_as_singles = varargin{7};
-        if isstring(samples_as_singles)  % mex functions take strings as char arrays
-            samples_as_singles = char(samples_as_singles);
+        if isempty(samples_as_singles) == false
+            if isstring(samples_as_singles)  % mex functions only take strings as char arrays
+                samples_as_singles = char(samples_as_singles);
+            end
         end
     else
         samples_as_singles = [];
     end
 
+    % persistence_mode
     if nargin > 8
         persistence_mode = varargin{8};
-        if isstring(persistence_mode)
-            persistence_mode = char(persistence_mode);
+        if isempty(persistence_mode) == false
+            if ischar(persistence_mode) == false
+                if isstring(persistence_mode)
+                    persistence_mode = char(persistence_mode);
+                elseif isscalar(persistence_mode) == false
+                    help read_MED;
+                    return;
+                end
+            end
         end
     else
         persistence_mode = [];
     end
 
-
-    % launch mex function
+    % mex function
     try
         file_list = get_full_paths(file_list);
         session = read_MED_exec(file_list, start_time, end_time, start_index, end_index, password, reference_channel, samples_as_singles, persistence_mode);
-        if isa(session, 'logical')
+        if islogical(session)  % can be true, false, or structure
             if session == false
                 errordlg('read_MED() error', 'Read MED');
             end
@@ -155,7 +245,7 @@ function session = read_MED(file_list, varargin)
                 fprintf(2, '%s', msg);  % 2 == stderr, so red in command window
                 file_list = get_full_paths(file_list);
                 session = read_MED_exec(file_list, start_time, end_time, start_index, end_index, password, reference_channel, samples_as_singles, persistence_mode);
-                if isa(session, 'logical')
+                if islogical(session)  % can be true, false, or structure
                     if session == false
                         errordlg('read_MED() error', 'Read MED');
                     end
