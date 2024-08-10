@@ -1841,14 +1841,17 @@ function view_MED(varargin)
             potentially_increased_plot_time = true;
             plot_page(true);  % need raw data to generate trace ranges
         else
-            ranges_flag = false;
-            % clear old trace range patches (don't need to plot)
+            % clear old trace range patches
             if (~isempty(range_patches))
                 for i = 1:numel(range_patches)
                     delete(range_patches{i});
                 end
                 range_patches = [];
             end
+            ranges_flag = false;
+            autoscale_flag = true;  % rescale traces
+            potentially_increased_plot_time = false;
+            plot_page(false);  % have raw data
         end
         set_movement_focus();
     end
