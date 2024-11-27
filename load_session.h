@@ -38,11 +38,11 @@
 	"session_end_time", \
 	"session_start_time_string", \
 	"session_end_time_string", \
-	"absolute_start_sample_number", \
-	"absolute_end_sample_number", \
+	"start_sample_number", \
+	"end_sample_number", \
 	"session_name", \
 	"channel_name", \
-	"indices_reference_channel_name", \
+	"index_channel_name", \
 	"anonymized_subject_ID", \
 	"session_UID", \
 	"channel_UID", \
@@ -84,11 +84,11 @@
 #define METADATA_FIELDS_SESSION_END_TIME_UUTC_IDX_mat                   6
 #define METADATA_FIELDS_SESSION_START_TIME_STRING_IDX_mat               7
 #define METADATA_FIELDS_SESSION_END_TIME_STRING_IDX_mat                 8
-#define METADATA_FIELDS_ABSOLUTE_START_SAMPLE_NUMBER_IDX_mat            9
-#define METADATA_FIELDS_ABSOLUTE_END_SAMPLE_NUMBER_IDX_mat              10
+#define METADATA_FIELDS_START_SAMPLE_NUMBER_IDX_mat			9
+#define METADATA_FIELDS_END_SAMPLE_NUMBER_IDX_mat			10
 #define METADATA_FIELDS_SESSION_NAME_IDX_mat                            11
 #define METADATA_FIELDS_CHANNEL_NAME_IDX_mat                            12
-#define METADATA_FIELDS_INDICES_REFERENCE_CHANNEL_NAME_mat		13
+#define METADATA_FIELDS_INDEX_CHANNEL_NAME_mat				13
 #define METADATA_FIELDS_ANONYMIZED_SUBJECT_ID_IDX_mat                 	14
 #define METADATA_FIELDS_SESSION_UID_IDX_mat                             15
 #define METADATA_FIELDS_CHANNEL_UID_IDX_mat                             16
@@ -151,7 +151,6 @@ si4     	load_session(void *file_list, si4 n_files, si1 *password, mxArray *plhs
 mxArray    	*build_discontigua(SESSION_m12 *sess);
 void		build_metadata(SESSION_m12 *sess, mxArray *mat_session);
 mxArray     	*get_sess_rec_times(SESSION_m12 *sess);
-si4		rec_compare(const void *a, const void *b);
 
 
 #endif /* LOAD_SESSION_IN */

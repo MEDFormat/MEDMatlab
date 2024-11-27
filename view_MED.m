@@ -1122,7 +1122,7 @@ function view_MED(varargin)
         set(current_time_textbox, 'Position', [(data_ax_right - 100), 75, 100, 20]);
         set(current_time_textbox_label, 'Position', [(data_ax_right - 155), 75, 50, 20]);
         
-        set(deselect_all_button, 'Position', [30, (data_ax_bot - 25), 117, 20]);
+        set(deselect_all_button, 'Position', [34, (data_ax_bot - 25), 81, 20]);
         set(records_checkbox, 'Position', [30, (data_ax_bot - 50), 117, 20]);
         set(ranges_checkbox, 'Position', [30, (data_ax_bot - 68), 117, 20]);
         set(monochrome_checkbox, 'Position', [30, (data_ax_bot - 86), 117, 20]);
@@ -1971,9 +1971,20 @@ function view_MED(varargin)
         clipboard('copy', blurb);
         blurb = [blurb newline newline '(copied to clipboard)'];
 
+        % see if segment record
+        if (strcmp(rec_type, 'Sgmt'))
+            seg_rec = true;
+            d_height = 225;
+            b_height = 170;
+        else
+            seg_rec = false;
+            d_height = 200;
+            b_height = 145;
+        end
+
         d_left = flag_screen_left - 170;
         d_bot = flag_screen_top - 260;
-        d = dialog('Position', [d_left d_bot 340 200], ...
+        d = dialog('Position', [d_left d_bot 340 d_height], ...
             'Name', title, ...
             'Color', 'white', ...
             'WindowStyle', 'normal', ...  % make dialog non-modal
@@ -1984,11 +1995,11 @@ function view_MED(varargin)
            'FontSize', SYS_FONT_SIZE, ...
            'BackgroundColor', 'white', ...
            'HorizontalAlignment', 'left', ...
-           'Position', [10 45 320 145], ...
+           'Position', [10 45 320 b_height], ...
            'Enable', 'inactive', ...  % fall through to dialog figure callbacks
            'String', blurb);
 
-         if (strcmp(rec_type, 'Sgmt') == 0)  % don't allow deletion of Sgmt recorsd
+         if (seg_rec == false)  % don't allow deletion of Sgmt records
              uicontrol('Parent', d, ...
                 'Style', 'pushbutton', ...
                 'Position', [230 10 100 25], ...
@@ -2089,12 +2100,13 @@ function view_MED(varargin)
         discont_end_time = raw_page.contigua(discont_idx + 1).start_time - 1;
         discont_start_string = ['Start Time: ' raw_page.contigua(discont_idx).end_time_string];
         if discont_end_time <= discont_start_time
-            discont_end_time = discont_start_time - 1;  % can occur due to time rounding error (set duration to zero)
-            discont_end_string = ['Start Time: ' raw_page.contigua(discont_idx).end_time_string];
+            discont_dur = 0;      
+            discont_end_time = discont_start_time;  % can occur due to time rounding error (set duration to zero)
+            discont_end_string = discont_start_string;
         else
+            discont_dur = double((discont_end_time - discont_start_time) + 1);      
             discont_end_string = ['End Time: ' raw_page.contigua(discont_idx + 1).start_time_string];
         end
-        discont_dur = double((discont_end_time - discont_start_time) + 1);      
         if (discont_dur >= 3600000000)
             discont_dur = discont_dur / 3600000000;
             discont_unit = ' hours';
@@ -2111,14 +2123,16 @@ function view_MED(varargin)
             discont_unit = ' microseconds';
         end
         duration_string = ['Duration: ' num2str(discont_dur) discont_unit];
+        num_start_string = ['Start Time (oUTC): ' num2str(discont_start_time)];
+        num_end_string = ['End Time (oUTC): ' num2str(discont_end_time)];
 
-        blurb = [discont_start_string newline discont_end_string newline duration_string];
+        blurb = [discont_start_string newline num_start_string newline discont_end_string newline num_end_string newline duration_string];
         clipboard('copy', blurb);
         blurb = [blurb newline newline '(copied to clipboard)'];
 
         d_left = zag_screen_left - 170;
         d_bot = zag_screen_top - 180;
-        d = dialog('Position', [d_left d_bot 340 100], ...
+        d = dialog('Position', [d_left d_bot 340 120], ...
             'Name', 'Discontinuity', ...
             'Color', 'white', ...
             'WindowStyle', 'normal', ...  % make dialog non-modal
@@ -2126,7 +2140,7 @@ function view_MED(varargin)
             'WindowButtonDownFcn', @any_interaction_callback);
 
         uicontrol('Parent', d, ...
-           'Position', [10 10 320 80], ...
+           'Position', [10 10 320 100], ...
            'Style', 'text', ...
            'FontSize', SYS_FONT_SIZE, ...
            'BackgroundColor', 'white', ...

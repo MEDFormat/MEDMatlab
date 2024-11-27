@@ -45,13 +45,13 @@ function read_MED_GUI()
 
     MIN_F_LEFT = 1;
     MIN_F_BOTTOM = 1;
-    MIN_F_WIDTH = 520;
-    MIN_F_HEIGHT = 600;
+    MIN_F_WIDTH = 540;
+    MIN_F_HEIGHT = 700;
     INITIAL_X_F_OFFSET = 200;
     INITIAL_Y_F_OFFSET = 100;
     AX_OFFSET = 25;
     TEXT_BOX_HEIGHT = 30;
-    TEXT_BOX_WIDTH = 150;
+    TEXT_BOX_WIDTH = 170;
     HALF_TEXT_BOX_HEIGHT = TEXT_BOX_HEIGHT / 2;
 
     % Globals
@@ -83,7 +83,6 @@ function read_MED_GUI()
         'Position', [INITIAL_X_F_OFFSET INITIAL_Y_F_OFFSET fWidth fHeight], ...
         'HandleVisibility','on', ...
         'IntegerHandle','off', ...
-        'Renderer','painters', ...
         'Toolbar','none', ...
         'Menubar','none', ...
         'NumberTitle','off', ...
@@ -137,7 +136,7 @@ function read_MED_GUI()
     channelListbox = uicontrol(fig, ...
         'Style', 'listbox', ...
         'String', {}, ...
-        'Position', [faxLeft (faxBottom + 100) (faxWidth - 270) (faxHeight - 180)], ...
+        'Position', [faxLeft (faxBottom + 100) (faxWidth - 290) (faxHeight - 180)], ...
         'FontSize', SYS_FONT_SIZE,...
         'FontName', 'FixedWidth', ...
         'FontWeight', 'bold', ...
@@ -150,7 +149,7 @@ function read_MED_GUI()
     selectChannelsPushbutton = uicontrol(fig, ...
         'Style', 'pushbutton', ...
         'String', 'Select Session/Channels', ...
-        'Position', [faxLeft (faxBottom + 60) (faxWidth - 270) TEXT_BOX_HEIGHT], ...
+        'Position', [faxLeft (faxBottom + 60) (faxWidth - 290) TEXT_BOX_HEIGHT], ...
         'BackgroundColor', panelColor, ...
         'FontSize', SYS_FONT_SIZE, ...
         'FontName', 'FixedWidth', ...
@@ -161,7 +160,7 @@ function read_MED_GUI()
     trimToSelectedPushbutton = uicontrol(fig, ...
         'Style', 'pushbutton', ...
         'String', 'Trim to Selected', ...
-        'Position', [faxLeft (faxBottom + 30) (faxWidth - 270) TEXT_BOX_HEIGHT], ...
+        'Position', [faxLeft (faxBottom + 30) (faxWidth - 290) TEXT_BOX_HEIGHT], ...
         'BackgroundColor', panelColor, ...
         'FontSize', SYS_FONT_SIZE, ...
         'FontName', 'FixedWidth', ...
@@ -172,7 +171,7 @@ function read_MED_GUI()
     removeSelectedPushbutton = uicontrol(fig, ...
         'Style', 'pushbutton', ...
         'String', 'Remove Selected', ...
-        'Position', [faxLeft faxBottom (faxWidth - 270) TEXT_BOX_HEIGHT], ...
+        'Position', [faxLeft faxBottom (faxWidth - 290) TEXT_BOX_HEIGHT], ...
         'BackgroundColor', panelColor, ...
         'FontSize', SYS_FONT_SIZE, ...
         'FontName', 'FixedWidth', ...
@@ -202,8 +201,8 @@ function read_MED_GUI()
     passwordTextbox.String = repmat('*', [1 length(DEFAULT_PASSWORD)]);
 
     % Extents Label (link to top-right, axis coords)
-    extentsLabel = text('Position', [(axRight - TEXT_BOX_WIDTH - 10) (axTop - 153)], ...
-        'String', 'Slice Extents:', ...
+    extentsLabel = text('Position', [(axRight - TEXT_BOX_WIDTH - 10) (axTop - 160)], ...
+        'String', ['Slice ' newline 'Extents:'], ...
         'Color', 'k', ...
         'FontSize', SYS_FONT_SIZE, ...
         'HorizontalAlignment', 'right', ...
@@ -237,9 +236,9 @@ function read_MED_GUI()
         'Style', 'radiobutton', ...
         'String', 'absolute', ...
         'Value', 1, ...
-        'Position', [(faxRight - TEXT_BOX_WIDTH) (faxTop - 177) (TEXT_BOX_WIDTH / 2) TEXT_BOX_HEIGHT], ...
+        'Position', [(faxRight - TEXT_BOX_WIDTH) (faxTop - 182) (TEXT_BOX_WIDTH / 2) TEXT_BOX_HEIGHT], ...
         'BackgroundColor', panelColor, ...
-        'FontSize', SYS_FONT_SIZE - 2, ...
+        'FontSize', SYS_FONT_SIZE, ...
         'FontName', 'FixedWidth', ...
         'HorizontalAlignment', 'left', ...
         'Callback', @timeModeRadiobuttonsCallback);
@@ -247,16 +246,16 @@ function read_MED_GUI()
         'Style', 'radiobutton', ...
         'String', 'relative', ...
         'Value', 0, ...
-        'Position', [(faxRight - (TEXT_BOX_WIDTH / 2)) (faxTop - 177) (TEXT_BOX_WIDTH / 2) TEXT_BOX_HEIGHT], ...
+        'Position', [(faxRight - (TEXT_BOX_WIDTH / 2)) (faxTop - 182) (TEXT_BOX_WIDTH / 2) TEXT_BOX_HEIGHT], ...
         'BackgroundColor', panelColor, ...
-        'FontSize', SYS_FONT_SIZE - 2, ...
+        'FontSize', SYS_FONT_SIZE, ...
         'FontName', 'FixedWidth', ...
         'HorizontalAlignment', 'left', ...
         'Enable', 'on', ...
         'Callback', @timeModeRadiobuttonsCallback);
 
     % Start Label (link to top-right, axis coords)
-    startLabel = text('Position', [(axRight - TEXT_BOX_WIDTH - 10) (axTop - 208)], ...
+    startLabel = text('Position', [(axRight - TEXT_BOX_WIDTH - 10) (axTop - 218)], ...
         'String', 'Start:', ...
         'Color', 'k', ...
         'FontSize', SYS_FONT_SIZE, ...
@@ -268,7 +267,7 @@ function read_MED_GUI()
     startTextbox = uicontrol(fig, ...
         'Style', 'edit', ...
         'String', 'start', ...
-        'Position', [(faxRight - TEXT_BOX_WIDTH) (faxTop - 208) TEXT_BOX_WIDTH TEXT_BOX_HEIGHT], ...
+        'Position', [(faxRight - TEXT_BOX_WIDTH) (faxTop - 218) TEXT_BOX_WIDTH TEXT_BOX_HEIGHT], ...
         'BackgroundColor', 'white', ...
         'FontSize', SYS_FONT_SIZE, ...
         'FontName', 'FixedWidth', ...
@@ -276,7 +275,7 @@ function read_MED_GUI()
         'Callback', @limitTextboxCallback);
 
     % End Label (link to top-right, axis coords)
-    endLabel = text('Position', [(axRight - TEXT_BOX_WIDTH - 10) (axTop - 243)], ...
+    endLabel = text('Position', [(axRight - TEXT_BOX_WIDTH - 10) (axTop - 253)], ...
         'String', 'End:', ...
         'Color', 'k', ...
         'FontSize', SYS_FONT_SIZE, ...
@@ -288,7 +287,7 @@ function read_MED_GUI()
     endTextbox = uicontrol(fig, ...
         'Style', 'edit', ...
         'String', 'end', ...
-        'Position', [(faxRight - TEXT_BOX_WIDTH) (faxTop - 243) TEXT_BOX_WIDTH TEXT_BOX_HEIGHT], ...
+        'Position', [(faxRight - TEXT_BOX_WIDTH) (faxTop - 253) TEXT_BOX_WIDTH TEXT_BOX_HEIGHT], ...
         'BackgroundColor', 'white', ...
         'FontSize', SYS_FONT_SIZE, ...
         'FontName', 'FixedWidth', ...
@@ -296,8 +295,8 @@ function read_MED_GUI()
         'Callback', @limitTextboxCallback);
  
     % Reference Channel Label (link to top-right, axis coords)
-    referenceChannelLabel = text('Position', [(axRight - TEXT_BOX_WIDTH - 10) (axTop - 295)], ...
-        'String', ['Index Ref ' newline 'Channel:'], ...
+    referenceChannelLabel = text('Position', [(axRight - TEXT_BOX_WIDTH - 10) (axTop - 310)], ...
+        'String', ['Indices' newline 'Channel:'], ...
         'Color', 'k', ...
         'FontSize', SYS_FONT_SIZE, ...
         'HorizontalAlignment', 'right', ...
@@ -309,7 +308,7 @@ function read_MED_GUI()
     referenceChannelTextbox = uicontrol(fig, ...
         'Style', 'edit', ...
         'String', '', ...
-        'Position', [(faxRight - TEXT_BOX_WIDTH) (faxTop - 295) TEXT_BOX_WIDTH TEXT_BOX_HEIGHT], ...
+        'Position', [(faxRight - TEXT_BOX_WIDTH) (faxTop - 310) TEXT_BOX_WIDTH TEXT_BOX_HEIGHT], ...
         'BackgroundColor', 'white', ...
         'FontSize', SYS_FONT_SIZE, ...
         'FontName', 'FixedWidth', ...
@@ -320,7 +319,7 @@ function read_MED_GUI()
     useSelectedPushbutton = uicontrol(fig, ...
         'Style', 'pushbutton', ...
         'String', 'Use Selected', ...
-        'Position', [(faxRight - TEXT_BOX_WIDTH) (faxTop - 330) TEXT_BOX_WIDTH TEXT_BOX_HEIGHT], ...
+        'Position', [(faxRight - TEXT_BOX_WIDTH) (faxTop - 345) TEXT_BOX_WIDTH TEXT_BOX_HEIGHT], ...
         'BackgroundColor', panelColor, ...
         'FontSize', SYS_FONT_SIZE, ...
         'FontName', 'FixedWidth', ...
@@ -333,14 +332,47 @@ function read_MED_GUI()
         'Style', 'checkbox', ...
         'String', 'Samples as Singles', ...
         'Value', 0, ...
-        'Position', [(faxRight - TEXT_BOX_WIDTH - 3) (faxTop - 370) TEXT_BOX_WIDTH TEXT_BOX_HEIGHT], ...
+        'Position', [(faxRight - TEXT_BOX_WIDTH - 3) (faxTop - 391) TEXT_BOX_WIDTH TEXT_BOX_HEIGHT], ...
         'BackgroundColor', panelColor, ...
         'FontSize', SYS_FONT_SIZE, ...
         'FontName', 'FixedWidth', ...
         'HorizontalAlignment', 'left');
     
-    % Persistence Mode Label (link to top-right, axis coords)
-    persistenceModeLabel = text('Position', [(axRight - TEXT_BOX_WIDTH - 10) (axTop - 410)], ...
+    % Metadata Checkbox (link to top-right, figure coords)
+    metadataCheckbox = uicontrol(fig, ...
+        'Style', 'checkbox', ...
+        'String', 'Metadata', ...
+        'Value', 1, ...
+        'Position', [(faxRight - TEXT_BOX_WIDTH - 3) (faxTop - 417) TEXT_BOX_WIDTH TEXT_BOX_HEIGHT], ...
+        'BackgroundColor', panelColor, ...
+        'FontSize', SYS_FONT_SIZE, ...
+        'FontName', 'FixedWidth', ...
+        'HorizontalAlignment', 'left');
+    
+    % Records Checkbox (link to top-right, figure coords)
+    recordsCheckbox = uicontrol(fig, ...
+        'Style', 'checkbox', ...
+        'String', 'Records', ...
+        'Value', 1, ...
+        'Position', [(faxRight - TEXT_BOX_WIDTH - 3) (faxTop - 443) TEXT_BOX_WIDTH TEXT_BOX_HEIGHT], ...
+        'BackgroundColor', panelColor, ...
+        'FontSize', SYS_FONT_SIZE, ...
+        'FontName', 'FixedWidth', ...
+        'HorizontalAlignment', 'left');
+    
+    % Contigua Checkbox (link to top-right, figure coords)
+    contiguaCheckbox = uicontrol(fig, ...
+        'Style', 'checkbox', ...
+        'String', 'Contigua', ...
+        'Value', 1, ...
+        'Position', [(faxRight - TEXT_BOX_WIDTH - 3) (faxTop - 468) TEXT_BOX_WIDTH TEXT_BOX_HEIGHT], ...
+        'BackgroundColor', panelColor, ...
+        'FontSize', SYS_FONT_SIZE, ...
+        'FontName', 'FixedWidth', ...
+        'HorizontalAlignment', 'left');
+    
+    % Persistence Mode Label (link to top-right, figure coords)
+    persistenceModeLabel = text('Position', [(axRight - TEXT_BOX_WIDTH - 10) (axTop - 511)], ...
         'String', ['Persistence ' newline 'Mode:'], ...
         'Color', 'k', ...
         'FontSize', SYS_FONT_SIZE, ...
@@ -352,14 +384,14 @@ function read_MED_GUI()
     persistenceModeDropdown = uicontrol(fig, ...
         'Style', 'popupmenu', ...
         'String', {'None (default)', 'Open', 'Close', 'Read', 'Read New', 'Read Close'}, ...
-        'Position', [(faxRight - TEXT_BOX_WIDTH - 7) (faxTop - 417) (TEXT_BOX_WIDTH + 16) TEXT_BOX_HEIGHT], ...
+        'Position', [(faxRight - TEXT_BOX_WIDTH - 7) (faxTop - 518) (TEXT_BOX_WIDTH + 16) TEXT_BOX_HEIGHT], ...
         'BackgroundColor', 'white', ...
         'FontSize', SYS_FONT_SIZE, ...
         'FontName', 'FixedWidth', ...
         'HorizontalAlignment', 'left');
 
     % Variable Name Label (link to top-right, axis coords)
-    variableNameLabel = text('Position', [(axRight - TEXT_BOX_WIDTH - 10) (axTop - 460)], ...
+    variableNameLabel = text('Position', [(axRight - TEXT_BOX_WIDTH - 10) (axTop - 555)], ...
         'String', ['Variable ' newline 'Name:'], ...
         'Color', 'k', ...
         'FontSize', SYS_FONT_SIZE, ...
@@ -371,34 +403,34 @@ function read_MED_GUI()
     variableNameTextbox = uicontrol(fig, ...
         'Style', 'edit', ...
         'String', DEFAULT_VARIABLE_NAME, ...
-        'Position', [(faxRight - TEXT_BOX_WIDTH) (faxTop - 460) TEXT_BOX_WIDTH TEXT_BOX_HEIGHT], ...
+        'Position', [(faxRight - TEXT_BOX_WIDTH) (faxTop - 555) TEXT_BOX_WIDTH TEXT_BOX_HEIGHT], ...
         'BackgroundColor', 'white', ...
         'FontSize', SYS_FONT_SIZE, ...
         'FontName', 'FixedWidth', ...
         'HorizontalAlignment', 'left');
 
-    % Export to Workspace Pushbutton (link to top-right, figure coords)
-    exportToWorkspacePushbutton = uicontrol(fig, ...
-        'Style', 'pushbutton', ...
-        'String', 'Export to Workspace', ...
-        'Position', [(faxRight - TEXT_BOX_WIDTH) (faxTop - 505) TEXT_BOX_WIDTH TEXT_BOX_HEIGHT], ...
-        'BackgroundColor', panelColor, ...
-        'FontSize', SYS_FONT_SIZE, ...
-        'FontName', 'FixedWidth', ...
-        'HorizontalAlignment', 'left', ...
-        'Callback', @exportToWorkspacePushbuttonCallback);
-    
-    % Plot Pushbutton
+    % Plot Pushbutton (link to bottom-right, figure coords)
     plotPushbutton = uicontrol(fig, ...
         'Style', 'pushbutton', ...
         'String', 'Plot', ...
-        'Position', [(faxRight - TEXT_BOX_WIDTH) (faxTop - 535) TEXT_BOX_WIDTH TEXT_BOX_HEIGHT], ...
+        'Position', [(faxRight - TEXT_BOX_WIDTH) (faxBottom + 30) TEXT_BOX_WIDTH TEXT_BOX_HEIGHT], ...
         'BackgroundColor', panelColor, ...
         'FontSize', SYS_FONT_SIZE, ...
         'FontName', 'FixedWidth', ...
         'HorizontalAlignment', 'left', ...
         'Callback', @plotPushbuttonCallback);
 
+    % Export to Workspace Pushbutton (link to bottom-right, figure coords)
+    exportToWorkspacePushbutton = uicontrol(fig, ...
+        'Style', 'pushbutton', ...
+        'String', 'Export to Workspace', ...
+        'Position', [(faxRight - TEXT_BOX_WIDTH) faxBottom TEXT_BOX_WIDTH TEXT_BOX_HEIGHT], ...
+        'BackgroundColor', panelColor, ...
+        'FontSize', SYS_FONT_SIZE, ...
+        'FontName', 'FixedWidth', ...
+        'HorizontalAlignment', 'left', ...
+        'Callback', @exportToWorkspacePushbuttonCallback);
+    
     % Set initial focus to Select Channels Pushbutton
     uicontrol(selectChannelsPushbutton);
 
@@ -454,16 +486,16 @@ function read_MED_GUI()
         set(channelListboxLabel, 'Position', [axLeft (axTop - 70)]);
      
         % Channel Listbox (link to width & height, figure coords)
-        set(channelListbox, 'Position', [faxLeft (faxBottom + 100) (faxWidth - 270) (faxHeight - 180)]);
+        set(channelListbox, 'Position', [faxLeft (faxBottom + 100) (faxWidth - 290) (faxHeight - 180)]);
 
         % Select Channels Pushbutton (link to bottom-left, figure coords)
-        set(selectChannelsPushbutton, 'Position', [faxLeft (faxBottom + 60) (faxWidth - 270) TEXT_BOX_HEIGHT]);
+        set(selectChannelsPushbutton, 'Position', [faxLeft (faxBottom + 60) (faxWidth - 290) TEXT_BOX_HEIGHT]);
     
         % Trim to Selected Pushbutton (link to bottom-left, figure coords)
-        set(trimToSelectedPushbutton, 'Position', [faxLeft (faxBottom + 30) (faxWidth - 270) TEXT_BOX_HEIGHT]);
+        set(trimToSelectedPushbutton, 'Position', [faxLeft (faxBottom + 30) (faxWidth - 290) TEXT_BOX_HEIGHT]);
 
         % Remove Selected Pushbutton (link to bottom-left, figure coords)
-        set(removeSelectedPushbutton, 'Position', [faxLeft faxBottom (faxWidth - 270) TEXT_BOX_HEIGHT]);
+        set(removeSelectedPushbutton, 'Position', [faxLeft faxBottom (faxWidth - 290) TEXT_BOX_HEIGHT]);
 
         % Password Label (link to top-right, axis coords)
         set(passwordLabel, 'Position', [(axRight - TEXT_BOX_WIDTH - 10) (axTop - 93)]);
@@ -472,57 +504,72 @@ function read_MED_GUI()
         set(passwordTextbox, 'Position', [(faxRight - TEXT_BOX_WIDTH) (faxTop - 93) TEXT_BOX_WIDTH TEXT_BOX_HEIGHT]);
 
         % Extents Label (link to top-right, axis coords)
-        set(extentsLabel, 'Position', [(axRight - TEXT_BOX_WIDTH - 10) (axTop - 153)]);
+        set(extentsLabel, 'Position', [(axRight - TEXT_BOX_WIDTH - 10) (axTop - 160)]);
 
         % Extent Mode Radiobuttons
         set(timesRadiobutton, 'Position', [(faxRight - TEXT_BOX_WIDTH) (faxTop - 153) (TEXT_BOX_WIDTH / 2) TEXT_BOX_HEIGHT]);
         set(indicesRadiobutton,'Position', [(faxRight - (TEXT_BOX_WIDTH / 2)) (faxTop - 153) (TEXT_BOX_WIDTH / 2) TEXT_BOX_HEIGHT]);
         
         % Time Mode Radiobuttons
-        set(absoluteRadiobutton, 'Position', [(faxRight - TEXT_BOX_WIDTH) (faxTop - 177) (TEXT_BOX_WIDTH / 2) TEXT_BOX_HEIGHT]);
-        set(relativeRadiobutton, 'Position', [(faxRight - (TEXT_BOX_WIDTH / 2)) (faxTop - 177) (TEXT_BOX_WIDTH / 2) TEXT_BOX_HEIGHT]);
+        set(absoluteRadiobutton, 'Position', [(faxRight - TEXT_BOX_WIDTH) (faxTop - 182) (TEXT_BOX_WIDTH / 2) TEXT_BOX_HEIGHT]);
+        set(relativeRadiobutton, 'Position', [(faxRight - (TEXT_BOX_WIDTH / 2)) (faxTop - 182) (TEXT_BOX_WIDTH / 2) TEXT_BOX_HEIGHT]);
 
         % Start Label (link to top-right, axis coords)
-        set(startLabel, 'Position', [(axRight - TEXT_BOX_WIDTH - 10) (axTop - 208)]);
+        set(startLabel, 'Position', [(axRight - TEXT_BOX_WIDTH - 10) (axTop - 218)]);
     
         % Start Textbox (link to top-right, figure coords)
-        set(startTextbox, 'Position', [(faxRight - TEXT_BOX_WIDTH) (faxTop - 208) TEXT_BOX_WIDTH TEXT_BOX_HEIGHT]);
+        set(startTextbox, 'Position', [(faxRight - TEXT_BOX_WIDTH) (faxTop - 218) TEXT_BOX_WIDTH TEXT_BOX_HEIGHT]);
     
         % End Label (link to top-right, axis coords)
-        set(endLabel, 'Position', [(axRight - TEXT_BOX_WIDTH - 10) (axTop - 243)]);
+        set(endLabel, 'Position', [(axRight - TEXT_BOX_WIDTH - 10) (axTop - 253)]);
     
         % End Textbox (link to top-right, figure coords)
-        set(endTextbox, 'Position', [(faxRight - TEXT_BOX_WIDTH) (faxTop - 243) TEXT_BOX_WIDTH TEXT_BOX_HEIGHT]);
+        set(endTextbox, 'Position', [(faxRight - TEXT_BOX_WIDTH) (faxTop - 253) TEXT_BOX_WIDTH TEXT_BOX_HEIGHT]);
  
-        % Persistence Mode Label (link to top-right, axis coords)
-        set(persistenceModeLabel, 'Position', [(axRight - TEXT_BOX_WIDTH - 10) (axTop - 316)]);
-    
-        % Persistence Mode Dropdown (link to top-right, figure coords)
-        set(persistenceModeDropdown, 'Position', [(faxRight - TEXT_BOX_WIDTH - 7) (faxTop - 323) (TEXT_BOX_WIDTH + 16) TEXT_BOX_HEIGHT]);
-
         % Variable Name Label (link to top-right, axis coords)
-        set(variableNameLabel, 'Position', [(axRight - TEXT_BOX_WIDTH - 10) (axTop - 394)]);
+        set(variableNameLabel, 'Position', [(axRight - TEXT_BOX_WIDTH - 10) (axTop - 494)]);
     
         % Variable Name Textbox (link to top-right, figure coords)
-        set(variableNameTextbox, 'Position', [(faxRight - TEXT_BOX_WIDTH) (faxTop - 394) TEXT_BOX_WIDTH TEXT_BOX_HEIGHT]);
+        set(variableNameTextbox, 'Position', [(faxRight - TEXT_BOX_WIDTH) (faxTop - 494) TEXT_BOX_WIDTH TEXT_BOX_HEIGHT]);
         
         % Reference Channel Label (link to top-right, axis coords)
-        set(referenceChannelLabel, 'Position', [(axRight - TEXT_BOX_WIDTH - 10) (axTop - 382)]);
+        set(referenceChannelLabel, 'Position', [(axRight - TEXT_BOX_WIDTH - 10) (axTop - 320)]);
     
         % Reference Channel Textbox (link to top-right, figure coords)
-        set(referenceChannelTextbox, 'Position', [(faxRight - TEXT_BOX_WIDTH) (faxTop - 382) TEXT_BOX_WIDTH TEXT_BOX_HEIGHT]);
+        set(referenceChannelTextbox, 'Position', [(faxRight - TEXT_BOX_WIDTH) (faxTop - 310) TEXT_BOX_WIDTH TEXT_BOX_HEIGHT]);
 
         % Use Selected Pushbutton (link to top-right, figure coords)
-        set(useSelectedPushbutton, 'Position', [(faxRight - TEXT_BOX_WIDTH) (faxTop - 417) TEXT_BOX_WIDTH TEXT_BOX_HEIGHT]);
+        set(useSelectedPushbutton, 'Position', [(faxRight - TEXT_BOX_WIDTH) (faxTop - 345) TEXT_BOX_WIDTH TEXT_BOX_HEIGHT]);
         
         % Samples as Singles Checkbox (link to top-right, figure coords)
-        set(samplesAsSinglesCheckbox, 'Position', [(faxRight - TEXT_BOX_WIDTH) (faxTop - 472) TEXT_BOX_WIDTH TEXT_BOX_HEIGHT])   
+        set(samplesAsSinglesCheckbox, 'Position', [(faxRight - TEXT_BOX_WIDTH) (faxTop - 391) TEXT_BOX_WIDTH TEXT_BOX_HEIGHT]); 
         
-        % Export to Workspace Pushbutton (link to top-right, figure coords)
-        set(exportToWorkspacePushbutton, 'Position', [(faxRight - TEXT_BOX_WIDTH) (faxTop - 505) TEXT_BOX_WIDTH TEXT_BOX_HEIGHT]);
-        
-        % Plot Pushbutton (link to top-right, figure coords)
-        set(plotPushbutton, 'Position', [(faxRight - TEXT_BOX_WIDTH) (faxTop - 535) TEXT_BOX_WIDTH TEXT_BOX_HEIGHT]);
+        % Metadata Checkbox (link to top-right, figure coords)
+        set(metadataCheckbox, 'Position', [(faxRight - TEXT_BOX_WIDTH) (faxTop - 417) TEXT_BOX_WIDTH TEXT_BOX_HEIGHT]);
+      
+        % Records Checkbox (link to top-right, figure coords)
+        set(recordsCheckbox, 'Position', [(faxRight - TEXT_BOX_WIDTH) (faxTop - 443) TEXT_BOX_WIDTH TEXT_BOX_HEIGHT]); 
+      
+        % Contigua Checkbox (link to top-right, figure coords)
+        set(contiguaCheckbox, 'Position', [(faxRight - TEXT_BOX_WIDTH) (faxTop - 469) TEXT_BOX_WIDTH TEXT_BOX_HEIGHT]);
+ 
+        % Persistence Mode Label (link to top-right, figure coords)
+        set(persistenceModeLabel, 'Position', [(axRight - TEXT_BOX_WIDTH - 10) (axTop - 511)]);
+
+        % Persistence Mode Dropdown (link to top-right, figure coords)
+        set(persistenceModeDropdown, 'Position', [(faxRight - TEXT_BOX_WIDTH - 7) (faxTop - 518) (TEXT_BOX_WIDTH + 16) TEXT_BOX_HEIGHT]);
+
+        % Variable Name Label (link to top-right, figure coords)
+        set(variableNameLabel, 'Position', [(axRight - TEXT_BOX_WIDTH - 10) (axTop - 555)]);
+
+        % Variable Name Textbox (link to top-right, figure coords)
+        set(variableNameTextbox, 'Position', [(faxRight - TEXT_BOX_WIDTH) (faxTop - 555) TEXT_BOX_WIDTH TEXT_BOX_HEIGHT]);
+
+        % Plot Pushbutton (link to bottom-right, figure coords)
+        set(plotPushbutton, 'Position', [(faxRight - TEXT_BOX_WIDTH) (faxBottom + 30) TEXT_BOX_WIDTH TEXT_BOX_HEIGHT]);
+
+        % Export to Workspace Pushbutton (link to bottom-right, figure coords)
+        set(exportToWorkspacePushbutton, 'Position', [(faxRight - TEXT_BOX_WIDTH) faxBottom TEXT_BOX_WIDTH TEXT_BOX_HEIGHT]);
 
     end  % figureResizeCallback()
 
@@ -584,6 +631,7 @@ function read_MED_GUI()
         end
         channelListbox.Value = [];
         channelListbox.String = channelListbox.String(1:n_selected);
+        sessionSelected = false;
     end  % trimToSelectedPushbuttonCallback()
 
 
@@ -651,12 +699,16 @@ function read_MED_GUI()
 
         check_limits();
         specsChanged = true;
+
     end  % extentModeRadiobuttonsCallback()
 
 
     % Time Mode Radiobuttons
     function timeModeRadiobuttonsCallback(src, ~)
         if (src == absoluteRadiobutton)
+            if (indicesRadiobutton.Value == true)
+                absoluteRadiobutton.Value = true;  % no relative indices
+            end
             if (absoluteRadiobutton.Value == false)
                 relativeRadiobutton.Value = true;
             else
@@ -670,9 +722,31 @@ function read_MED_GUI()
             end
         end
 
+        % if switched to absolute, make negatives positive
+        if (timesRadiobutton.Value == true)
+            lim = convert_limits(startTextbox.String);
+            if (isnumeric(lim) == true)
+               if (absoluteRadiobutton.Value == true)
+                  if (lim < 0)
+                       startTextbox.String = num2str(-lim);
+                    end
+                end
+            end
+    
+            lim = convert_limits(endTextbox.String);
+            if (isnumeric(lim) == true)
+                if (absoluteRadiobutton.Value == true)
+                    if (lim < 0)
+                        endTextbox.String = num2str(-lim);
+                    end
+                end
+            end
+        end
+
         check_limits();
         specsChanged = true;
-    end  % extentModeRadiobuttonsCallback()
+        
+    end  % timeModeRadiobuttonsCallback()
 
 
     function limitTextboxCallback(~, ~)
@@ -685,9 +759,9 @@ function read_MED_GUI()
     function useSelectedPushbuttonCallback(~, ~)
         n_selected = numel(channelListbox.Value);
         if (n_selected < 1)
-            errordlg('No channel selected');
+            errordlg('No channel selected', 'Read MED GUI');
         elseif (n_selected > 1)
-            errordlg('Only one channel can be selected');
+            errordlg('Only one channel can be selected', 'Read MED GUI');
         else
             referenceChannelTextbox.String = char(channelListbox.String(channelListbox.Value(1)));
             specsChanged = true;
@@ -699,7 +773,7 @@ function read_MED_GUI()
     % Password Textbox
     function passwordTextboxCallback(~, ~)
         if (length(passwordTextbox.String) > MAX_PASSWORD_LENGTH)
-            errordlg('Password is too long', 'Read MED GUI Error');
+            errordlg('Password is too long', 'Read MED GUI');
             passwordTextbox.String = '';
         end
         specsChanged = true;
@@ -711,7 +785,6 @@ function read_MED_GUI()
         if specsChanged == true
            success = get_data();
            if success == false
-                errordlg('read_MED() error', 'Read MED GUI');
                 return;
             end
         end
@@ -726,7 +799,6 @@ function read_MED_GUI()
         if specsChanged == true
             success = get_data();
             if success == false
-                errordlg('read_MED() error', 'Read MED GUI');
                 return;
             end
         end
@@ -750,33 +822,39 @@ function read_MED_GUI()
 
 
     function check_limits()
+
         lim = convert_limits(startTextbox.String);
         if (isnumeric(lim) == true)
-            lim = abs(lim);
             if (timesRadiobutton.Value == true)
-                if (absoluteRadiobutton.Value == true)
-                    startTextbox.String = num2str(lim);
-                else
-                    startTextbox.String = num2str(-lim);
+                if (lim < 0)
+                    if (absoluteRadiobutton.Value == true)
+                        absoluteRadiobutton.Value = false;
+                        relativeRadiobutton.Value = true;
+                    end
+                elseif (relativeRadiobutton.Value == true)
+                    startTextbox.String = num2str(-lim); % make negative
                 end
-            else
-                startTextbox.String = num2str(lim);
+            elseif (lim < 0)
+                startTextbox.String = num2str(-lim); % no negative indices
             end
         end
 
         lim = convert_limits(endTextbox.String);
         if (isnumeric(lim) == true)
-            lim = abs(lim);
             if (timesRadiobutton.Value == true)
-                if (absoluteRadiobutton.Value == true)
-                    endTextbox.String = num2str(lim);
-                else
-                    endTextbox.String = num2str(-lim);
+                if (lim < 0)
+                    if (absoluteRadiobutton.Value == true)
+                        absoluteRadiobutton.Value = false;
+                        relativeRadiobutton.Value = true;
+                    end
+                elseif (relativeRadiobutton.Value == true)
+                    endTextbox.String = num2str(-lim); % make negative
                 end
-            else
-                endTextbox.String = num2str(lim);
+            elseif (lim < 0)
+                endTextbox.String = num2str(-lim); % no negative indices
             end
         end
+
     end  % check_limits()
 
 
@@ -789,7 +867,7 @@ function read_MED_GUI()
         file_list = get_file_list();
         if (numel(file_list) == 0)
             set(fig, 'Pointer', 'arrow');
-            errordlg('No MED session or channels are specified');
+            errordlg('No MED session or channels are specified', 'Read MED GUI');
             return;
         end
         start_lim = convert_limits(startTextbox.String);
@@ -810,6 +888,24 @@ function read_MED_GUI()
             samps_as_singles = 'true';
         else
             samps_as_singles = 'false';
+        end
+
+        if (metadataCheckbox.Value == true)
+            metadata = 'true';
+        else
+            metadata = 'false';
+        end
+
+        if (recordsCheckbox.Value == true)
+            records = 'true';
+        else
+            records = 'false';
+        end
+
+        if (contiguaCheckbox.Value == true)
+            contigua = 'true';
+        else
+            contigua = 'false';
         end
 
         persist_val = persistenceModeDropdown.Value;
@@ -838,13 +934,17 @@ function read_MED_GUI()
             show_command(file_list);
         end
 
-        slice = read_MED(file_list, start_time, end_time, start_index, end_index, passwordTextbox.UserData.password, referenceChannelTextbox.String, samps_as_singles, persist_num);
+        slice = read_MED(file_list, start_time, end_time, start_index, end_index, passwordTextbox.UserData.password, referenceChannelTextbox.String, samps_as_singles, persist_num, metadata, records, contigua);
 
-        if (isempty(slice))
-            success = false;
-        else
-            success = true;            
+        if islogical(slice)  % can be true, false, or structure
+            if slice == false
+                set(fig, 'Pointer', 'arrow');
+                errordlg('read_MED() error', 'Read MED GUI');
+                success = false;
+                return;
+            end
         end
+        success = true;            
         specsChanged = false;
 
         set(fig, 'Pointer', 'arrow');
@@ -862,47 +962,159 @@ function read_MED_GUI()
         end
         fl = [fl '''' char(file_list(n_files)) '''};' newline];
 
+        v = evalin('base', 'logical(exist(''file_list'', ''var''))');
+        if (v == true)
+            fprintf(2, '\nFile list variable exists in workspace. To replace, execute: ');
+        else
+            evalin('base', fl);
+            fprintf(2, '\nExecuted: ');
+        end
         disp(fl);
-
+    
         % build command string
+        command = '';
+        last_default_set = false;
+
+        default_val = true;
+        if (contiguaCheckbox.Value == true)
+            contigua = '[]';
+        else
+            contigua = 'false';
+            default_val = false;
+        end
+        if (last_default_set == true)
+            command = [command ', ' contigua];
+        elseif (default_val == false)
+            command = contigua;
+            last_default_set = true;
+        end 
+
+        default_val = true;
+        if (recordsCheckbox.Value == true)
+            records = '[]';
+        else
+            records = 'false';
+            default_val = false;
+        end
+        if (last_default_set == true)
+            command = [records ', ' command];
+        elseif (default_val == false)
+            command = records;
+            last_default_set = true;
+        end 
+
+        default_val = true;
+        if (metadataCheckbox.Value == true)
+            metadata = '[]';
+        else
+            metadata = 'false';
+            default_val = false;
+        end
+        if (last_default_set == true)
+            command = [metadata ', ' command];
+        elseif (default_val == false)
+            command = metadata;
+            last_default_set = true;
+        end 
+
+        default_val = true;
+        if (persist_num > 0)
+            persist_str = ['''' persist_str ''''];
+            default_val = false;
+        else
+            persist_str = '[]';
+        end 
+        if (last_default_set == true)
+            command = [persist_str ', ' command];
+        elseif (default_val == false)
+            command = persist_str;
+            last_default_set = true;
+        end 
+
+        default_val = true;
+        if (samplesAsSinglesCheckbox.Value == true)
+            samps_as_singles = 'true';
+            default_val = false;
+        else
+            samps_as_singles = '[]';
+        end 
+        if (last_default_set == true)
+            command = [samps_as_singles ', ' command];
+        elseif (default_val == false)
+            command = samps_as_singles;
+            last_default_set = true;
+        end 
+
+        default_val = true;
+        if (isempty(referenceChannelTextbox.String))
+            ref_chan_str = '[]';
+        elseif (get(referenceChannelTextbox, 'Visible') == false)
+            ref_chan_str = '[]';
+        else
+            ref_chan_str = ['''' referenceChannelTextbox.String ''''];
+            default_val = false;
+        end
+        if (last_default_set == true)
+            command = [ref_chan_str ', ' command];
+        elseif (default_val == false)
+            command = ref_chan_str;
+            last_default_set = true;
+        end
+
+        if (isempty(passwordTextbox.UserData.password))
+            password_str = '[]';
+        else
+            password_str = '''<password>''';
+            default_val = false;
+        end
+        if (last_default_set == true)
+            command = [password_str ', ' command];
+        elseif (default_val == false)
+            command = password_str;
+            last_default_set = true;
+        end
+
+        default_val = true;
         if (strcmp(startTextbox.String, 'start') == true)
-            start_str = '''start''';
+            start_str = '[]';
         else
             start_str = startTextbox.String;
+            default_val = false;
         end
         if (strcmp(endTextbox.String, 'end') == true)
-            end_str = '''end''';
+            end_str = '[]';
         else
             end_str = endTextbox.String;
+            default_val = false;
         end
 
         if (timesRadiobutton.Value == true)
             start_time = start_str;
             end_time = end_str;
-            start_index = '[]';
-            end_index = '[]';
-            ref_chan_str = '[]';
+            if (last_default_set == true)
+                command = [start_time ', ' end_time ', [], [], ' command];
+            elseif (default_val == false)
+                command = [start_time ', ' end_time];
+                last_default_set = true;
+            end 
         else
-            start_time = '[]';
-            end_time = '[]';
             start_index = start_str;
             end_index = end_str;
-            if (isempty(referenceChannelTextbox.String))
-                ref_chan_str = '[]';
-            elseif (numel(referenceChannelTextbox.String) == 0)
-                ref_chan_str = '[]';
-            else
-                ref_chan_str = ['''' referenceChannelTextbox.String ''''];
-            end
+            if (last_default_set == true)
+                command = ['[], [], ' start_index ', ' end_index ', ' command];
+            elseif (default_val == false)
+                command = ['[], [], ' start_index ', ' end_index];
+                last_default_set = true;
+            end 
         end
 
-        if (samplesAsSinglesCheckbox.Value == true)
-            samps_as_singles = 'true';
+        if (last_default_set == true)
+            command = [variableNameTextbox.String ' = read_MED(file_list, ' command  ');' newline];
         else
-            samps_as_singles = 'false';
-        end 
+            command = [variableNameTextbox.String ' = read_MED(file_list);' newline];
+        end
 
-        command = [variableNameTextbox.String ' = read_MED(file_list, ' start_time ', ' end_time ', ' start_index ', ' end_index ', ''<password>'', ' ref_chan_str ', ' samps_as_singles ', ''' persist_str ''');' newline];
+        fprintf(2, 'Executed: \n');
         disp(command);
 
     end  % show_command()

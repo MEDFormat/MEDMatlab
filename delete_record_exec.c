@@ -109,7 +109,7 @@ sf8	delete_record(si1 *chan_dir, si1 *password, si8 rec_time, ui4 rec_type)
 	// read session
 	G_initialize_time_slice_m12(&slice);
 	slice.start_time = slice.end_time = rec_time;
-	flags = LH_INCLUDE_TIME_SERIES_CHANNELS_m12 | LH_READ_FULL_SEGMENTED_SESS_RECS_m12 | LH_READ_SEGMENT_METADATA_m12;
+	flags = (LH_READ_FULL_SEGMENTED_SESS_RECS_m12 | LH_READ_SEGMENT_METADATA_m12);
 	sess = G_open_session_m12(NULL, &slice, chan_dir, 0, flags, password);  // unthreaded version (just one channel)
 	if (sess == NULL) {
 		if (globals_m12->password_data.processed == 0) {

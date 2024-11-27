@@ -8,17 +8,6 @@
 //*******************************************************************************************************//
 
 
-// session = read_MED(file_list, [start_time], [end_time], [password], [samples_as_singles], [times_as_indices], [ref_chan])
-// file_list: string array, strings can contain regexp
-// start_time: if empty/absent, defaults to session/channel start
-// end_time: if empty/absent, defaults to session/channel end
-// start_index: if empty/absent, defaults to session/channel start
-// end_index: if empty/absent, defaults to session/channel end
-// password: if empty/absent, proceeds as if unencrypted (may error out)
-// ref_chan: if empty/absent, (and necessary) defaults to first channel
-// samples_as_singles: if empty/absent, defaults to 'false' (options: 'true', 'false')
-// returns Matlab session structure
-
 #include "read_MED_exec.h"
 
 // Globals
@@ -45,11 +34,11 @@ void	mexExitFunction(void)
 // Mex gateway routine
 void    mexFunction(si4 nlhs, mxArray *plhs[], si4 nrhs, const mxArray *prhs[])
 {
-	TERN_m12                	samples_as_singles;
+	TERN_m12                	samples_as_singles, metadata, records, contigua;
         void                    	*file_list;
 	ui1				persist_mode;
         si1                     	password[PASSWORD_BYTES_m12 + 1], temp_str[16], **file_list_p;
-        si1                     	reference_channel[FULL_FILE_NAME_BYTES_m12];
+        si1                     	index_channel[FULL_FILE_NAME_BYTES_m12];
         si4                     	i, len, max_len, n_files;
         si8                     	start_time, end_time, start_index, end_index, tmp_si8;
         mxArray                 	*mx_cell_p, *mat_sess;
@@ -74,8 +63,8 @@ void    mexFunction(si4 nlhs, mxArray *plhs[], si4 nrhs, const mxArray *prhs[])
 	if (nlhs != 1)
 		mexErrMsgTxt("One output required: MED session structure, or logical value\n");
 	plhs[0] = mxCreateLogicalScalar((mxLogical) 0);  // set "false" return value for subsequent errors
-	if (nrhs < 1 || nrhs > 9)
-		mexErrMsgTxt("One to 9 inputs required: file_list, [start_time], [end_time], [start_index], [start_index], [password], [reference_channel], [samples_as_singles], [persistence_mode]\n");
+	if (nrhs < 1 || nrhs > 12)
+		mexErrMsgTxt("One to 12 inputs required: file_list, [start_time], [end_time], [start_index], [start_index], [password], [index_channel], [samples_as_singles], [persistence_mode], [metadata], [records], [contigua]\n");
 
 	// get persistence mode if passed
 	persist_mode = PERSIST_NONE; // default (== PERSIST_READ_CLOSE)
@@ -239,18 +228,18 @@ void    mexFunction(si4 nlhs, mxArray *plhs[], si4 nrhs, const mxArray *prhs[])
                 }
         }
         
-        // ref_chan
-        *reference_channel = 0;
+        // index_channel
+        *index_channel = 0;
         if (nrhs > 6) {
                 if (mxIsEmpty(prhs[6]) == 0) {
                         if (mxGetClassID(prhs[6]) == mxCHAR_CLASS) {
                                 len = mxGetNumberOfElements(prhs[6]) + 1; // Get the length of the input string
                                 if (len > FULL_FILE_NAME_BYTES_m12)
-					mexErrMsgTxt("'reference_channel' (input 7) is too long (first channel is default)\n");
+					mexErrMsgTxt("'index_channel' (input 7) is too long (first channel is default)\n");
                                 else
-                                        mxGetString(prhs[6], reference_channel, len);
+                                        mxGetString(prhs[6], index_channel, len);
                         } else {
-				mexErrMsgTxt("'reference_channel' (input 7) must be a string (first channel is default)\n");
+				mexErrMsgTxt("'undex_channel' (input 7) must be a string (first channel is default)\n");
                         }
                 }
         }
@@ -270,7 +259,7 @@ void    mexFunction(si4 nlhs, mxArray *plhs[], si4 nrhs, const mxArray *prhs[])
 				if (mxIsLogicalScalarTrue(prhs[7]) == 1)
 					samples_as_singles = TRUE_m12;
 				 else
-					 samples_as_singles = FALSE_m12;
+					samples_as_singles = FALSE_m12;
 			 } else if (mxIsScalar(prhs[7])) {
 				 if (mxGetScalar(prhs[7]) == 1)
 					 samples_as_singles = TRUE_m12;
@@ -282,6 +271,87 @@ void    mexFunction(si4 nlhs, mxArray *plhs[], si4 nrhs, const mxArray *prhs[])
 		}
         }
 		
+	// metadata
+	metadata = TRUE_m12;
+	if (nrhs > 9) {
+		if (mxIsEmpty(prhs[9]) == 0) {
+			metadata = UNKNOWN_m12;
+			if (mxGetClassID(prhs[9]) == mxCHAR_CLASS) {
+				mxGetString(prhs[9], temp_str, 16);
+				if (*temp_str == 't' || *temp_str == 'T' || *temp_str == 'y' || *temp_str == 'Y' || *temp_str == '1')
+					metadata = TRUE_m12;
+				else if (*temp_str == 'f' || *temp_str == 'F' || *temp_str == 'n' || *temp_str == 'N' || *temp_str == '0')
+					metadata = FALSE_m12;
+			} else if (mxIsLogicalScalar(prhs[9])) {
+				if (mxIsLogicalScalarTrue(prhs[9]) == 1)
+					metadata = TRUE_m12;
+				 else
+					metadata = FALSE_m12;
+			 } else if (mxIsScalar(prhs[9])) {
+				 if (mxGetScalar(prhs[9]) == 1)
+					 metadata = TRUE_m12;
+				 else if (mxGetScalar(prhs[9]) == 0)
+					 metadata = FALSE_m12;
+			 }
+			if (metadata == UNKNOWN_m12)
+				mexErrMsgTxt("'metadata' (input 10) can be either true (default) or false only\n");
+		}
+	}
+
+	// records
+	records = TRUE_m12;
+	if (nrhs > 10) {
+		if (mxIsEmpty(prhs[10]) == 0) {
+			records = UNKNOWN_m12;
+			if (mxGetClassID(prhs[10]) == mxCHAR_CLASS) {
+				mxGetString(prhs[10], temp_str, 16);
+				if (*temp_str == 't' || *temp_str == 'T' || *temp_str == 'y' || *temp_str == 'Y' || *temp_str == '1')
+					records = TRUE_m12;
+				else if (*temp_str == 'f' || *temp_str == 'F' || *temp_str == 'n' || *temp_str == 'N' || *temp_str == '0')
+					records = FALSE_m12;
+			} else if (mxIsLogicalScalar(prhs[10])) {
+				if (mxIsLogicalScalarTrue(prhs[10]) == 1)
+					records = TRUE_m12;
+				 else
+					records = FALSE_m12;
+			 } else if (mxIsScalar(prhs[10])) {
+				 if (mxGetScalar(prhs[10]) == 1)
+					 records = TRUE_m12;
+				 else if (mxGetScalar(prhs[10]) == 0)
+					 records = FALSE_m12;
+			 }
+			if (records == UNKNOWN_m12)
+				mexErrMsgTxt("'records' (input 11) can be either true (default) or false only\n");
+		}
+	}
+
+	// contigua
+	contigua = TRUE_m12;
+	if (nrhs > 11) {
+		if (mxIsEmpty(prhs[11]) == 0) {
+			contigua = UNKNOWN_m12;
+			if (mxGetClassID(prhs[11]) == mxCHAR_CLASS) {
+				mxGetString(prhs[11], temp_str, 16);
+				if (*temp_str == 't' || *temp_str == 'T' || *temp_str == 'y' || *temp_str == 'Y' || *temp_str == '1')
+					contigua = TRUE_m12;
+				else if (*temp_str == 'f' || *temp_str == 'F' || *temp_str == 'n' || *temp_str == 'N' || *temp_str == '0')
+					contigua = FALSE_m12;
+			} else if (mxIsLogicalScalar(prhs[11])) {
+				if (mxIsLogicalScalarTrue(prhs[11]) == 1)
+					contigua = TRUE_m12;
+				 else
+					contigua = FALSE_m12;
+			 } else if (mxIsScalar(prhs[11])) {
+				 if (mxGetScalar(prhs[11]) == 1)
+					contigua = TRUE_m12;
+				 else if (mxGetScalar(prhs[11]) == 0)
+					contigua = FALSE_m12;
+			 }
+			if (contigua == UNKNOWN_m12)
+				mexErrMsgTxt("'contigua' (input 12) can be either true (default) or false only\n");
+		}
+	}
+
 	// create input file list
 	file_list = NULL;
 	switch (n_files) {
@@ -306,7 +376,7 @@ void    mexFunction(si4 nlhs, mxArray *plhs[], si4 nrhs, const mxArray *prhs[])
 	}
 			
         // get out of here
-	mat_sess = read_MED(file_list, n_files, start_time, end_time, start_index, end_index, password, reference_channel, samples_as_singles, persist_mode);
+	mat_sess = read_MED(file_list, n_files, start_time, end_time, start_index, end_index, password, index_channel, samples_as_singles, persist_mode, metadata, records, contigua);
 	if (mat_sess != NULL) {
 		mxDestroyArray(plhs[0]);
 		plhs[0] = mat_sess;
@@ -316,20 +386,22 @@ void    mexFunction(si4 nlhs, mxArray *plhs[], si4 nrhs, const mxArray *prhs[])
 	free_m12(file_list, __FUNCTION__);
 	
 	if (persist_mode & PERSIST_CLOSE) {
-		G_free_session_m12(med_sess, TRUE_m12);  // resets session globals (no not need to free until function unloaded)
-		med_sess = NULL;
+		if (med_sess != NULL) {
+			G_free_session_m12(med_sess, TRUE_m12);  // resets session globals (no not need to free until function unloaded)
+			med_sess = NULL;
+		}
 	}
 	
         return;
 }
 
 
-mxArray     *read_MED(void *file_list, si4 n_files, si8 start_time, si8 end_time, si8 start_idx, si8 end_idx, si1 *password, si1 *ref_chan, TERN_m12 samples_as_singles, ui1 persist_mode)
+mxArray     *read_MED(void *file_list, si4 n_files, si8 start_time, si8 end_time, si8 start_idx, si8 end_idx, si1 *password, si1 *ind_chan, TERN_m12 samples_as_singles, ui1 persist_mode, TERN_m12 metadata, TERN_m12 records, TERN_m12 contigua)
 {
 	si1					*action_str;
-        si4                                     n_channels, *seg_samps, n_segments;
+        si4                                     n_channels, n_active_channels, *seg_samps, n_segments;
 	ui8                                     n_dims, flags;
-        si8                                     i, j, k, n_seg_samps;
+        si8                                     i, j, k, m, n_seg_samps;
 	sf4					*mat_sf4_samps;
         sf8                                     *mat_sf8_samps;
         SESSION_m12                             *sess;
@@ -355,9 +427,9 @@ mxArray     *read_MED(void *file_list, si4 n_files, si8 start_time, si8 end_time
 	slice.end_time = end_time;
 	slice.start_sample_number = start_idx;
 	slice.end_sample_number = end_idx;
-	if (*ref_chan)
-		strcpy(globals_m12->reference_channel_name, ref_chan);
-	flags = (LH_INCLUDE_TIME_SERIES_CHANNELS_m12 | LH_READ_SLICE_SEGMENT_DATA_m12 | LH_READ_SLICE_SESSION_RECORDS_m12 | LH_READ_SLICE_SEGMENTED_SESS_RECS_m12);
+	if (*ind_chan)
+		strcpy(globals_m12->reference_channel_name, ind_chan);
+	flags = (LH_READ_SLICE_SEGMENT_DATA_m12 | LH_READ_SLICE_SESSION_RECORDS_m12 | LH_READ_SLICE_SEGMENTED_SESS_RECS_m12);
 	if (persist_mode & PERSIST_CLOSE) {
 		if (med_sess == NULL)
 			flags |= LH_NO_CPS_CACHING_m12;  // not efficient for single reads
@@ -373,9 +445,7 @@ mxArray     *read_MED(void *file_list, si4 n_files, si8 start_time, si8 end_time
 		}
 		action_str = "open";
 	} else {
-		//	printf_m12("%s(%d): set back to threaded\n", __FUNCTION__, __LINE__);
-		//	sess = G_read_session_nt_m12(sess, &slice, file_list, n_files, flags, password);  // non-threaded version
-		sess = G_read_session_m12(sess, &slice, file_list, n_files, flags, password);  // threaded version
+		sess = G_read_session_m12(sess, &slice, file_list, n_files, flags, password);
 		action_str = "read";
 	}
 	if (sess == NULL) {
@@ -396,7 +466,7 @@ mxArray     *read_MED(void *file_list, si4 n_files, si8 start_time, si8 end_time
 		}
 		return(NULL);
 	}
-
+	
        	/* ****************************************** */
         /* ********  Create Matlab structure  ******* */
         /* ****************************************** */
@@ -406,26 +476,36 @@ mxArray     *read_MED(void *file_list, si4 n_files, si8 start_time, si8 end_time
 
         // Create channel output structures
         n_channels = sess->number_of_time_series_channels;
-        mat_chans = mxCreateStructMatrix(n_channels, 1, n_mat_channel_fields, mat_channel_field_names);
+	for (i = n_active_channels = 0; i < n_channels; ++i) {
+		chan = sess->time_series_channels[i];
+		if (chan->flags & LH_CHANNEL_ACTIVE_m12)
+			++n_active_channels;
+	}
+        mat_chans = mxCreateStructMatrix(n_active_channels, 1, n_mat_channel_fields, mat_channel_field_names);
         mxSetFieldByNumber(mat_sess, 0, SESSION_FIELDS_CHANNELS_IDX_mat, mat_chans);
 
 	// build channel names (duplicated in metadata, but convenient for viewing
 	build_channel_names(sess, mat_sess);
 	
 	// Build metadata
-	build_metadata(sess, mat_sess);
+	if (metadata == TRUE_m12)
+		build_metadata(sess, mat_sess);
 
 	// Build contigua
-	build_contigua(sess, mat_sess);
+	if (contigua == TRUE_m12)
+		build_contigua(sess, mat_sess);
 	
-       // Build session records
-        build_session_records(sess, mat_sess);
+	// Build session records
+	if (records == TRUE_m12)
+        	build_session_records(sess, mat_sess);
 	
-       // Fill in channel data
+	// Fill in channel data
 	n_segments = sess->time_slice.number_of_segments;
 	n_dims = 2; dims[1] = 1;
-        for (i = 0; i < n_channels; ++i) {
-                chan = sess->time_series_channels[i];
+        for (i = j = 0; i < n_channels; ++i) {
+		chan = sess->time_series_channels[i];
+		if ((chan->flags & LH_CHANNEL_ACTIVE_m12) == 0)
+			continue;
 		dims[0] = TIME_SLICE_SAMPLE_COUNT_S_m12(chan->time_slice);
                 if (samples_as_singles == TRUE_m12) {
                         mat_data = mxCreateNumericArray(n_dims, dims, mxSINGLE_CLASS, mxREAL);
@@ -434,22 +514,24 @@ mxArray     *read_MED(void *file_list, si4 n_files, si8 start_time, si8 end_time
                         mat_data = mxCreateNumericArray(n_dims, dims, mxDOUBLE_CLASS, mxREAL);
                         mat_sf8_samps = (sf8 *) mxGetPr(mat_data);
                 }
-                for (j = 0; j < n_segments; ++j) {
-                        seg = chan->segments[j];
+		for (k = 0; k < n_segments; ++k) {
+                        seg = chan->segments[k];
                         cps = seg->time_series_data_fps->parameters.cps;
                         seg_samps = cps->decompressed_data;
 			n_seg_samps = TIME_SLICE_SAMPLE_COUNT_S_m12(seg->time_slice);
                         if (samples_as_singles == TRUE_m12) {
-				for (k = n_seg_samps; k--;)
+				for (m = n_seg_samps; m--;)
 					*mat_sf4_samps++ = (sf4) *seg_samps++;
                         } else {
-				for (k = n_seg_samps; k--;)
+				for (m = n_seg_samps; m--;) {
 					*mat_sf8_samps++ = (sf8) *seg_samps++;
+				}
                         }
                 }
-                mxSetFieldByNumber(mat_chans, i, CHANNEL_FIELDS_DATA_IDX_mat, mat_data);
+                mxSetFieldByNumber(mat_chans, j, CHANNEL_FIELDS_DATA_IDX_mat, mat_data);
+		++j;
         }
-
+	
 	// set global
 	med_sess = sess;
 
@@ -462,7 +544,7 @@ void	build_contigua(SESSION_m12 *sess, mxArray *mat_sess)
 {
 	TERN_m12			relative_days;
 	si1				time_str[TIME_STRING_BYTES_m12];
-        si8                             i, j, n_chans, n_contigs, samp_num, slice_start_sample_number, val;
+        si8                             i, j, k, n_chans, n_contigs, samp_num, slice_start_sample_number, val;
         CHANNEL_m12                     *chan;
 	CONTIGUON_m12			*contigua;
 	mxArray                         *mat_sess_contigua, *mat_chan_contigua, *mat_chans, *tmp_mxa;
@@ -522,27 +604,30 @@ void	build_contigua(SESSION_m12 *sess, mxArray *mat_sess)
 	mxSetFieldByNumber(mat_sess, 0, SESSION_FIELDS_CONTIGUA_IDX_mat, mat_sess_contigua);
 
 	// copy session contigua into channels
-	n_chans = sess->number_of_time_series_channels;
 	mat_chans = mxGetFieldByNumber(mat_sess, 0, SESSION_FIELDS_CHANNELS_IDX_mat);
 	n_chans = sess->number_of_time_series_channels;
-	for (i = 0; i < n_chans; ++i) {
+	for (i = j = 0; i < n_chans; ++i) {
+		chan = sess->time_series_channels[i];
+		if ((chan->flags & LH_CHANNEL_ACTIVE_m12) == 0)
+			continue;
+		
 		// copy session contigua
 		mat_chan_contigua = mxDuplicateArray(mat_sess_contigua);
 		if (globals_m12->time_series_frequencies_vary == TRUE_m12) {
-			chan = sess->time_series_channels[i];
 			slice_start_sample_number = chan->time_slice.start_sample_number;
-			for (j = 0; j < n_contigs; ++j) {
+			for (k = 0; k < n_contigs; ++k) {
 				// start index
-				tmp_mxa = mxGetFieldByNumber(mat_chan_contigua, j, CONTIGUON_FIELDS_START_INDEX_IDX_mat);
-				samp_num = G_sample_number_for_uutc_m12((LEVEL_HEADER_m12 *) chan, contigua[j].start_time, FIND_CURRENT_m12);
+				tmp_mxa = mxGetFieldByNumber(mat_chan_contigua, k, CONTIGUON_FIELDS_START_INDEX_IDX_mat);
+				samp_num = G_sample_number_for_uutc_m12((LEVEL_HEADER_m12 *) chan, contigua[k].start_time, FIND_CURRENT_m12);
 				*((si8 *) mxGetPr(tmp_mxa)) = (samp_num - slice_start_sample_number) + 1;
 				// end index
-				tmp_mxa = mxGetFieldByNumber(mat_chan_contigua, j, CONTIGUON_FIELDS_END_INDEX_IDX_mat);
-				samp_num = G_sample_number_for_uutc_m12((LEVEL_HEADER_m12 *) chan, contigua[j].end_time, FIND_CURRENT_m12);
+				tmp_mxa = mxGetFieldByNumber(mat_chan_contigua, k, CONTIGUON_FIELDS_END_INDEX_IDX_mat);
+				samp_num = G_sample_number_for_uutc_m12((LEVEL_HEADER_m12 *) chan, contigua[k].end_time, FIND_CURRENT_m12);
 				*((si8 *) mxGetPr(tmp_mxa)) = (samp_num - slice_start_sample_number) + 1;
 			}
 		}
-		mxSetFieldByNumber(mat_chans, i, CHANNEL_FIELDS_CONTIGUA_IDX_mat, mat_chan_contigua);
+		mxSetFieldByNumber(mat_chans, j, CHANNEL_FIELDS_CONTIGUA_IDX_mat, mat_chan_contigua);
+		++j;
 	}
  
         return;
@@ -552,7 +637,7 @@ void	build_contigua(SESSION_m12 *sess, mxArray *mat_sess)
 void	build_channel_names(SESSION_m12 *sess, mxArray *mat_sess)
 {
 	si4				seg_idx;
-	si8                             i, n_chans;
+	si8                             i, j, n_chans;
 	TIME_SLICE_m12			*slice;
 	CHANNEL_m12                     *chan;
 	FILE_PROCESSING_STRUCT_m12	*metadata_fps;
@@ -565,12 +650,15 @@ void	build_channel_names(SESSION_m12 *sess, mxArray *mat_sess)
 	slice = &sess->time_slice;
 	seg_idx = G_get_segment_index_m12(slice->start_segment_number);
 	mat_chans = mxGetFieldByNumber(mat_sess, 0, SESSION_FIELDS_CHANNELS_IDX_mat);
-	for (i = 0; i < n_chans; ++i) {
+	for (i = j = 0; i < n_chans; ++i) {
 		chan = sess->time_series_channels[i];
+		if ((chan->flags & LH_CHANNEL_ACTIVE_m12) == 0)
+			continue;
 		metadata_fps = chan->segments[seg_idx]->metadata_fps;
 		uh = metadata_fps->universal_header;
 		tmp_mxa = mxCreateString(uh->channel_name);
-		mxSetFieldByNumber(mat_chans, i, CHANNEL_FIELDS_NAME_IDX_mat, tmp_mxa);
+		mxSetFieldByNumber(mat_chans, j, CHANNEL_FIELDS_NAME_IDX_mat, tmp_mxa);
+		++j;
 	}
 	
 	return;
@@ -581,7 +669,7 @@ void    build_metadata(SESSION_m12 *sess, mxArray *mat_sess)
 {
 	TERN_m12				relative_days;
         si1                                     time_str[TIME_STRING_BYTES_m12];
-        si4                                     i, seg_idx, n_chans;
+        si4                                     i, j, seg_idx, n_chans;
 	mwSize					n_dims, dims[2];
 	CHANNEL_m12				*chan;
 	TIME_SLICE_m12				*slice;
@@ -661,7 +749,7 @@ void    build_metadata(SESSION_m12 *sess, mxArray *mat_sess)
                 *((si8 *) mxGetPr(tmp_mxa)) = -1;
         else
                 *((si8 *) mxGetPr(tmp_mxa)) = slice->start_sample_number + 1;  // convert to one-based indexing
-        mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_ABSOLUTE_START_SAMPLE_NUMBER_IDX_mat, tmp_mxa);
+        mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_START_SAMPLE_NUMBER_IDX_mat, tmp_mxa);
 
         // absolute end sample number
         tmp_mxa = mxCreateNumericArray(n_dims, dims, mxINT64_CLASS, mxREAL);
@@ -669,7 +757,7 @@ void    build_metadata(SESSION_m12 *sess, mxArray *mat_sess)
                 *((si8 *) mxGetPr(tmp_mxa)) = -1;
         else
                 *((si8 *) mxGetPr(tmp_mxa)) = slice->end_sample_number + 1;  // convert to one-based indexing
-        mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_ABSOLUTE_END_SAMPLE_NUMBER_IDX_mat, tmp_mxa);
+        mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_END_SAMPLE_NUMBER_IDX_mat, tmp_mxa);
 
         // session name
         tmp_mxa = mxCreateString(globals_m12->fs_session_name);  // use file system name in case subset
@@ -684,7 +772,7 @@ void    build_metadata(SESSION_m12 *sess, mxArray *mat_sess)
 
 	// indices reference channel name
 	tmp_mxa = mxCreateString(globals_m12->reference_channel_name);
-	mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_INDICES_REFERENCE_CHANNEL_NAME_mat, tmp_mxa);
+	mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_INDEX_CHANNEL_NAME_mat, tmp_mxa);
 
         // anonymized subject ID
         tmp_mxa = mxCreateString(uh->anonymized_subject_ID);
@@ -870,8 +958,10 @@ void    build_metadata(SESSION_m12 *sess, mxArray *mat_sess)
 	n_chans = sess->number_of_time_series_channels;
 	mat_chans = mxGetFieldByNumber(mat_sess, 0, SESSION_FIELDS_CHANNELS_IDX_mat);
 	n_chans = sess->number_of_time_series_channels;
-	for (i = 0; i < n_chans; ++i) {
+	for (i = j = 0; i < n_chans; ++i) {
 		chan = sess->time_series_channels[i];
+		if ((chan->flags & LH_CHANNEL_ACTIVE_m12) == 0)
+			continue;
 		metadata_fps = chan->segments[seg_idx]->metadata_fps;
 		tmd2 = &metadata_fps->metadata->time_series_section_2;
 		slice = &chan->time_slice;
@@ -879,10 +969,10 @@ void    build_metadata(SESSION_m12 *sess, mxArray *mat_sess)
 		mat_chan_metadata = mxDuplicateArray(mat_sess_metadata);
 		if (globals_m12->time_series_frequencies_vary == TRUE_m12) {
 			// absolute start sample number
-			tmp_mxa = mxGetFieldByNumber(mat_chan_metadata, 0, METADATA_FIELDS_ABSOLUTE_START_SAMPLE_NUMBER_IDX_mat);
+			tmp_mxa = mxGetFieldByNumber(mat_chan_metadata, 0, METADATA_FIELDS_START_SAMPLE_NUMBER_IDX_mat);
 			*((si8 *) mxGetPr(tmp_mxa)) = slice->start_sample_number + 1;  // convert to one-based indexing
 			// absolute end sample number
-			tmp_mxa = mxGetFieldByNumber(mat_chan_metadata, 0, METADATA_FIELDS_ABSOLUTE_END_SAMPLE_NUMBER_IDX_mat);
+			tmp_mxa = mxGetFieldByNumber(mat_chan_metadata, 0, METADATA_FIELDS_END_SAMPLE_NUMBER_IDX_mat);
 			*((si8 *) mxGetPr(tmp_mxa)) = slice->end_sample_number + 1;  // convert to one-based indexing
 			// sampling frequency
 			tmp_mxa = mxGetFieldByNumber(mat_chan_metadata, 0, METADATA_FIELDS_SAMPLING_FREQUENCY_IDX_mat);
@@ -919,7 +1009,8 @@ void    build_metadata(SESSION_m12 *sess, mxArray *mat_sess)
 		tmp_mxa = mxGetFieldByNumber(mat_chan_metadata, 0, METADATA_FIELDS_NOTCH_FILTER_FREQUENCY_SETTING_IDX_mat);
 		*((sf8 *) mxGetPr(tmp_mxa)) = tmd2->notch_filter_frequency_setting;
 
-		mxSetFieldByNumber(mat_chans, i, CHANNEL_FIELDS_METADATA_IDX_mat, mat_chan_metadata);
+		mxSetFieldByNumber(mat_chans, j, CHANNEL_FIELDS_METADATA_IDX_mat, mat_chan_metadata);
+		++j;
 	}
 
         return;
@@ -1327,12 +1418,24 @@ mxArray	*fill_record(RECORD_HEADER_m12 *rh)
 					tmp_mxa = mxCreateNumericArray(n_dims, dims, mxINT32_CLASS, mxREAL);
 					*((si4 *) mxGetPr(tmp_mxa)) = Sgmt_v11->segment_number;
 					mxSetFieldByNumber(mat_record, 0, SGMT_v11_RECORD_FIELDS_SEGMENT_NUMBER_IDX_mat, tmp_mxa);
+					// acquisition channel number
+					if (Sgmt_v11->acquisition_channel_number == REC_Sgmt_v11_ACQUISITION_CHANNEL_NUMBER_ALL_CHANNELS_m12) {
+						tmp_mxa = mxCreateString("all channels");
+					} else {
+						tmp_mxa = mxCreateNumericArray(n_dims, dims, mxINT32_CLASS, mxREAL);
+						*((si4 *) mxGetPr(tmp_mxa)) = Sgmt_v11->acquisition_channel_number;
+					}
+					mxSetFieldByNumber(mat_record, 0, SGMT_v11_RECORD_FIELDS_ACQUISITION_CHANNEL_NUMBER_IDX_mat, tmp_mxa);
 					// description
-					text = Sgmt_v11->description;
-					if (*text)
-						tmp_mxa = mxCreateString(text);
-					else
+					if (rh->total_record_bytes > (RECORD_HEADER_BYTES_m12 + REC_Sgmt_v11_BYTES_m12)) {
+						text = (si1 *) rh + RECORD_HEADER_BYTES_m12 + REC_Sgmt_v11_BYTES_m12;
+						if (*text)
+							tmp_mxa = mxCreateString(text);
+						else
+							tmp_mxa = mxCreateString("<no description>");
+					} else {
 						tmp_mxa = mxCreateString("<no description>");
+					}
 					mxSetFieldByNumber(mat_record, 0, SGMT_v11_RECORD_FIELDS_DESCRIPTION_IDX_mat, tmp_mxa);
 					break;
 				}

@@ -48,11 +48,11 @@
         "session_end_time", \
         "session_start_time_string", \
         "session_end_time_string", \
-        "absolute_start_sample_number", \
-        "absolute_end_sample_number", \
+        "start_sample_number", \
+        "end_sample_number", \
         "session_name", \
         "channel_name", \
-	"indices_reference_channel_name", \
+	"index_channel_name", \
         "anonymized_subject_ID", \
         "session_UID", \
         "channel_UID", \
@@ -94,11 +94,11 @@
 #define METADATA_FIELDS_SESSION_END_TIME_UUTC_IDX_mat                   6
 #define METADATA_FIELDS_SESSION_START_TIME_STRING_IDX_mat               7
 #define METADATA_FIELDS_SESSION_END_TIME_STRING_IDX_mat                 8
-#define METADATA_FIELDS_ABSOLUTE_START_SAMPLE_NUMBER_IDX_mat            9
-#define METADATA_FIELDS_ABSOLUTE_END_SAMPLE_NUMBER_IDX_mat              10
+#define METADATA_FIELDS_START_SAMPLE_NUMBER_IDX_mat			9
+#define METADATA_FIELDS_END_SAMPLE_NUMBER_IDX_mat			10
 #define METADATA_FIELDS_SESSION_NAME_IDX_mat                            11
 #define METADATA_FIELDS_CHANNEL_NAME_IDX_mat                            12
-#define METADATA_FIELDS_INDICES_REFERENCE_CHANNEL_NAME_mat		13
+#define METADATA_FIELDS_INDEX_CHANNEL_NAME_mat				13
 #define METADATA_FIELDS_ANONYMIZED_SUBJECT_ID_IDX_mat                 	14
 #define METADATA_FIELDS_SESSION_UID_IDX_mat                             15
 #define METADATA_FIELDS_CHANNEL_UID_IDX_mat                             16
@@ -273,7 +273,7 @@
 #define SGMT_v10_RECORD_FIELDS_DESCRIPTION_IDX_mat			15
 
 // Matlab Sgmt (v1.1) Record Structure
-#define NUMBER_OF_SGMT_v11_RECORD_FIELDS_mat				13
+#define NUMBER_OF_SGMT_v11_RECORD_FIELDS_mat				14
 #define SGMT_v11_RECORD_FIELD_NAMES_mat { \
 	"start_time", \
 	"start_time_string", \
@@ -287,6 +287,7 @@
 	"start_sample_number", \
 	"end_sample_number", \
 	"segment_number", \
+	"acquistion_channel_number", \
 	"description" \
 }
 #define SGMT_v11_RECORD_FIELDS_END_TIME_IDX_mat				7
@@ -294,7 +295,8 @@
 #define SGMT_v11_RECORD_FIELDS_START_SAMPLE_NUMBER_IDX_mat		9
 #define SGMT_v11_RECORD_FIELDS_END_SAMPLE_NUMBER_IDX_mat		10
 #define SGMT_v11_RECORD_FIELDS_SEGMENT_NUMBER_IDX_mat			11
-#define SGMT_v11_RECORD_FIELDS_DESCRIPTION_IDX_mat			12
+#define SGMT_v11_RECORD_FIELDS_ACQUISITION_CHANNEL_NUMBER_IDX_mat	12
+#define SGMT_v11_RECORD_FIELDS_DESCRIPTION_IDX_mat			13
 
 // Matlab Unknown Record Structure
 #define NUMBER_OF_UNKN_RECORD_FIELDS_mat	8
@@ -315,7 +317,7 @@
 void		mexExitFunction(void);
 void            mexFunction(si4 nlhs, mxArray *plhs[], si4 nrhs, const mxArray *prhs[]);
 si8             get_si8_scalar(const mxArray *mx_arr);
-mxArray     	*read_MED(void *file_list, si4 n_files, si8 start_time, si8 end_time, si8 start_idx, si8 end_idx, si1 *password, si1 *ref_chan, TERN_m12 samples_as_singles, ui1 persist_mode);
+mxArray     	*read_MED(void *file_list, si4 n_files, si8 start_time, si8 end_time, si8 start_idx, si8 end_idx, si1 *password, si1 *idx_chan, TERN_m12 samples_as_singles, ui1 persist_mode, TERN_m12 metadata, TERN_m12 records, TERN_m12 contigua);
 void		build_channel_names(SESSION_m12 *sess, mxArray *mat_sess);
 void    	build_metadata(SESSION_m12 *sess, mxArray *mat_session);
 void		build_contigua(SESSION_m12 *sess, mxArray *mat_session);

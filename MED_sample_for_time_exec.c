@@ -122,7 +122,7 @@ mxArray     *MED_sample_for_time(mxArray *times, si1 *MED_directory, si1 *passwo
 	si1			tmp_str[FULL_FILE_NAME_BYTES_m12], extension[TYPE_BYTES_m12], **channel_list;
         si4			i, len, n_channels;
 	ui8			flags;
-	si8			min_time, max_time, tmp_time, *times_p, test_time, sess_start, offset;
+	si8			min_time, max_time, tmp_time, *times_p, sess_start, offset;
         CHANNEL_m12		*chan;
         TIME_SLICE_m12		slice;
 
@@ -133,13 +133,13 @@ mxArray     *MED_sample_for_time(mxArray *times, si1 *MED_directory, si1 *passwo
 	if (*extension == 0) {
 		// see if time series channel with this name exists
 		sprintf_m12(tmp_str, "%s.%s", MED_directory, TIME_SERIES_CHANNEL_DIRECTORY_TYPE_STRING_m12);
-		if (G_file_exists_m12(tmp_str) == DIR_EXISTS_m12) {
+		if (G_exists_m12(tmp_str) == DIR_EXISTS_m12) {
 			strcpy(MED_directory, tmp_str);
 			strcpy(extension, TIME_SERIES_CHANNEL_DIRECTORY_TYPE_STRING_m12);
 		} else {
 			// see if session with this name exists
 			sprintf_m12(MED_directory, "%s.%s", MED_directory, SESSION_DIRECTORY_TYPE_STRING_m12);
-			if (G_file_exists_m12(MED_directory) == DIR_EXISTS_m12)
+			if (G_exists_m12(MED_directory) == DIR_EXISTS_m12)
 				strcpy(extension, SESSION_DIRECTORY_TYPE_STRING_m12);
 			else
 				return(NULL);
@@ -181,7 +181,7 @@ mxArray     *MED_sample_for_time(mxArray *times, si1 *MED_directory, si1 *passwo
         G_initialize_time_slice_m12(&slice);
 	slice.start_time = min_time;
 	slice.end_time = max_time;
-	flags = LH_READ_SLICE_SEGMENT_DATA_m12;  // read in time series indices (this could be made more efficient)
+	flags = (LH_READ_SLICE_SEGMENT_DATA_m12 | LH_MAP_ALL_SEGMENTS_m12);  // read in time series indices (this could be made more efficient)
 	chan = G_open_channel_m12(NULL, &slice, MED_directory, flags, password);  // threaded version
 	if (chan == NULL) {
 		if (globals_m12->password_data.processed == 0) {
@@ -198,25 +198,27 @@ mxArray     *MED_sample_for_time(mxArray *times, si1 *MED_directory, si1 *passwo
 		return(NULL);
 	}
 
-	// condition times
-	if (max_time < 0 || min_time < 0) {
-		sess_start = globals_m12->session_start_time;
-		for (i = 0; i < len; ++i)
+	// convert to oUTC
+	// user probably used only one method of specifying times, but you never know so check every time
+
+	// relative times
+	sess_start = globals_m12->session_start_time;
+	for (i = 0; i < len; ++i)
+		if (times_p[i] < 0)  // time is relative
 			times_p[i] = sess_start - times_p[i];
-	} else {  // ? offset times
-		test_time = max_time - globals_m12->recording_time_offset;
-		if (test_time > 0) {  // times are not offset
-			offset = globals_m12->session_start_time;
-			for (i = 0; i < len; ++i)
-				times_p[i] -= offset;
-		}
+		
+	// absolute times
+	offset = globals_m12->recording_time_offset;
+	for (i = 0; i < len; ++i) {
+		if ((times_p[i] - offset) > 0)  // time is absolute
+			times_p[i] -= offset;
 	}
 
 	// get samples (put in times array)
 	for (i = 0; i < len; ++i)
 		times_p[i] = G_sample_number_for_uutc_m12((LEVEL_HEADER_m12 *) chan, times_p[i], (FIND_ABSOLUTE_m12 | FIND_CURRENT_m12));
 	
-        // clean up
+       	// clean up
 	G_free_channel_m12(chan, TRUE_m12);
 
         return(times);

@@ -144,7 +144,7 @@ si4     load_session(void *file_list, si4 n_files, si1 *password, mxArray *plhs[
         // read session
 	sess_slice = &local_sess_slice;
         G_initialize_time_slice_m12(sess_slice);
-	flags = (LH_INCLUDE_TIME_SERIES_CHANNELS_m12 | LH_READ_SEGMENT_METADATA_m12 | LH_READ_SLICE_SESSION_RECORDS_m12 | LH_READ_SLICE_SEGMENTED_SESS_RECS_m12);
+	flags = (LH_READ_SEGMENT_METADATA_m12 | LH_READ_SLICE_SESSION_RECORDS_m12 | LH_READ_SLICE_SEGMENTED_SESS_RECS_m12);
 //	printf_m12("%s(%d): switch back to threaded\n", __FUNCTION__, __LINE__);
 //	sess = G_open_session_nt_m12(NULL, sess_slice, file_list, n_files, flags, password);
 	sess = G_open_session_m12(NULL, sess_slice, file_list, n_files, flags, password);
@@ -324,7 +324,7 @@ void    build_metadata(SESSION_m12 *sess, mxArray *mat_session)
 		*((si8 *) mxGetPr(tmp_mxa)) = -1;
 	else
 		*((si8 *) mxGetPr(tmp_mxa)) = 1;  // one-based indexing	
-	mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_ABSOLUTE_START_SAMPLE_NUMBER_IDX_mat, tmp_mxa);
+	mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_START_SAMPLE_NUMBER_IDX_mat, tmp_mxa);
 
 	// absolute end sample number
 	tmp_mxa = mxCreateNumericArray(n_dims, dims, mxINT64_CLASS, mxREAL);
@@ -332,7 +332,7 @@ void    build_metadata(SESSION_m12 *sess, mxArray *mat_session)
 		*((si8 *) mxGetPr(tmp_mxa)) = -1;
 	else
 		*((si8 *) mxGetPr(tmp_mxa)) = slice->end_sample_number + 1;  // convert to one-based indexing
-	mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_ABSOLUTE_END_SAMPLE_NUMBER_IDX_mat, tmp_mxa);
+	mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_END_SAMPLE_NUMBER_IDX_mat, tmp_mxa);
 
 	// session name
 	tmp_mxa = mxCreateString(globals_m12->fs_session_name);  // use file system name in case subset
@@ -347,7 +347,7 @@ void    build_metadata(SESSION_m12 *sess, mxArray *mat_session)
 
 	// indices reference channel name
 	tmp_mxa = mxCreateString(globals_m12->reference_channel_name);
-	mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_INDICES_REFERENCE_CHANNEL_NAME_mat, tmp_mxa);
+	mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_INDEX_CHANNEL_NAME_mat, tmp_mxa);
 
 	// anonymized subject ID
 	tmp_mxa = mxCreateString(uh->anonymized_subject_ID);
@@ -542,10 +542,10 @@ void    build_metadata(SESSION_m12 *sess, mxArray *mat_session)
 		mat_chan_metadata = mxDuplicateArray(mat_sess_metadata);
 		if (globals_m12->time_series_frequencies_vary == TRUE_m12) {
 			// absolute start sample number
-			tmp_mxa = mxGetFieldByNumber(mat_chan_metadata, 0, METADATA_FIELDS_ABSOLUTE_START_SAMPLE_NUMBER_IDX_mat);
+			tmp_mxa = mxGetFieldByNumber(mat_chan_metadata, 0, METADATA_FIELDS_START_SAMPLE_NUMBER_IDX_mat);
 			*((si8 *) mxGetPr(tmp_mxa)) = 1;  // one-based indexing
 			// absolute end sample number
-			tmp_mxa = mxGetFieldByNumber(mat_chan_metadata, 0, METADATA_FIELDS_ABSOLUTE_END_SAMPLE_NUMBER_IDX_mat);
+			tmp_mxa = mxGetFieldByNumber(mat_chan_metadata, 0, METADATA_FIELDS_END_SAMPLE_NUMBER_IDX_mat);
 			*((si8 *) mxGetPr(tmp_mxa)) = tmd2->absolute_start_sample_number + tmd2->number_of_samples;  // one-based indexing
 			// sampling frequency
 			tmp_mxa = mxGetFieldByNumber(mat_chan_metadata, 0, METADATA_FIELDS_SAMPLING_FREQUENCY_IDX_mat);
@@ -696,25 +696,4 @@ mxArray     *get_sess_rec_times(SESSION_m12 *sess)
 	free((void *) rec_times);
 
 	return(mat_rec_props);
-}
-
-
-si4     rec_compare(const void *a, const void *b)
-{
-	si8	time_d;
-	
-	
-	time_d = (*((RECORD_HEADER_m12 **) a))->start_time - (*((RECORD_HEADER_m12 **) b))->start_time;
-	
-	// sort by time
-	if (time_d > 0)
-		return(1);
-	if (time_d < 0)
-		return(-1);
-	
-	// if same time, sort by location in memory
-	if ((ui8) *((RECORD_HEADER_m12 **) a) > (ui8) *((RECORD_HEADER_m12 **) a))
-		return(1);
-
-	return(-1);
 }

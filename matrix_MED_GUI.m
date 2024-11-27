@@ -84,7 +84,6 @@ function matrix_MED_GUI()
         'Position', [INITIAL_X_F_OFFSET INITIAL_Y_F_OFFSET fWidth fHeight], ...
         'HandleVisibility','on', ...
         'IntegerHandle','off', ...
-        'Renderer','painters', ...
         'Toolbar','none', ...
         'Menubar','none', ...
         'NumberTitle','off', ...
@@ -569,6 +568,7 @@ function matrix_MED_GUI()
         end
         channelListbox.Value = [];
         channelListbox.String = channelListbox.String(1:n_selected);
+        sessionSelected = false;
     end  % trimToSelectedPushbuttonCallback()
 
 
@@ -617,6 +617,25 @@ function matrix_MED_GUI()
                 absoluteRadiobutton.Value = true;
             else
                 absoluteRadiobutton.Value = false;
+            end
+        end
+
+        % if switched to absolute, make negatives positive
+        lim = convert_limits(startTextbox.String);
+        if (isnumeric(lim) == true)
+            if (absoluteRadiobutton.Value == true)
+                if (lim < 0)
+                   startTextbox.String = num2str(-lim);
+                end
+            end
+        end
+
+        lim = convert_limits(endTextbox.String);
+        if (isnumeric(lim) == true)
+            if (absoluteRadiobutton.Value == true)
+                if (lim < 0)
+                    endTextbox.String = num2str(-lim);
+                end
             end
         end
 
@@ -689,21 +708,25 @@ function matrix_MED_GUI()
     function check_limits()
         lim = convert_limits(startTextbox.String);
         if (isnumeric(lim) == true)
-            lim = abs(lim);
-            if (absoluteRadiobutton.Value == true)
-                startTextbox.String = num2str(lim);
-            else
-                startTextbox.String = num2str(-lim);
+            if (lim < 0)
+                if (absoluteRadiobutton.Value == true)
+                    absoluteRadiobutton.Value = false;
+                    relativeRadiobutton.Value = true;
+                end
+            elseif (relativeRadiobutton.Value == true)
+                startTextbox.String = num2str(-lim); % make negative
             end
         end
 
         lim = convert_limits(endTextbox.String);
         if (isnumeric(lim) == true)
-            lim = abs(lim);
-            if (absoluteRadiobutton.Value == true)
-                endTextbox.String = num2str(lim);
-            else
-                endTextbox.String = num2str(-lim);
+            if (lim < 0)
+                if (absoluteRadiobutton.Value == true)
+                    absoluteRadiobutton.Value = false;
+                    relativeRadiobutton.Value = true;
+                end
+            elseif (relativeRadiobutton.Value == true)
+                endTextbox.String = num2str(-lim); % make negative
             end
         end
     end  % check_limits()
@@ -800,6 +823,14 @@ function matrix_MED_GUI()
         fl = [fl '''' char(chan_list(n_chans)) '''};' newline];
 
         disp(fl);
+        v = evalin('base', 'logical(exist(''file_list'', ''var''))');
+        if (v == true)
+            fprintf(2, '\nFile list variable exists in workspace. To replace, execute: ');
+        else
+            evalin('base', fl);
+            fprintf(2, '\nExecuted: ');
+        end
+        disp(fl);
 
         % build command string
         if (strcmp(startTextbox.String, 'start') == true)
@@ -834,6 +865,8 @@ function matrix_MED_GUI()
         end 
 
         command = [variableNameTextbox.String ' = matrix_MED(file_list, ' n_out_samps ', ' start_time ', ' end_time  ', ''<password>'', ' antialias ', ' detrend ', ' trace_ranges ', ''' persist_str ''');' newline];
+
+        fprintf(2, 'Executed: \n');
         disp(command);
 
     end  % show_command()

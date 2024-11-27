@@ -132,13 +132,13 @@ mxArray     *MED_time_for_sample(mxArray *samples, si1 *MED_directory, si1 *pass
 	if (*extension == 0) {
 		// see if time series channel with this name exists
 		sprintf_m12(tmp_str, "%s.%s", MED_directory, TIME_SERIES_CHANNEL_DIRECTORY_TYPE_STRING_m12);
-		if (G_file_exists_m12(tmp_str) == DIR_EXISTS_m12) {
+		if (G_exists_m12(tmp_str) == DIR_EXISTS_m12) {
 			strcpy(MED_directory, tmp_str);
 			strcpy(extension, TIME_SERIES_CHANNEL_DIRECTORY_TYPE_STRING_m12);
 		} else {
 			// see if session with this name exists
 			sprintf_m12(MED_directory, "%s.%s", MED_directory, SESSION_DIRECTORY_TYPE_STRING_m12);
-			if (G_file_exists_m12(MED_directory) == DIR_EXISTS_m12)
+			if (G_exists_m12(MED_directory) == DIR_EXISTS_m12)
 				strcpy(extension, SESSION_DIRECTORY_TYPE_STRING_m12);
 			else {
 				return(NULL);
@@ -165,15 +165,13 @@ mxArray     *MED_time_for_sample(mxArray *samples, si1 *MED_directory, si1 *pass
 	samps_p = (si8 *) mxGetPr(samples);
 	
 	// convert from Matlab to MED numbering
-	for (i = 0; i < len; ++i) {
-		if (samps_p[i])
-			continue;
-		break;
-	}
+	for (i = 0; i < len; ++i)
+		if (samps_p[i] == 0)
+			break;
 	if (i == len) {
 		for (i = 0; i < len; ++i)
 			--samps_p[i];
-	} // else there was a zero - assume already in MED numbering
+	} // else there was a zero - assume all samples already in MED numbering
 
 	// get slice extents
 	max_samp = min_samp = samps_p[0];
@@ -188,7 +186,7 @@ mxArray     *MED_time_for_sample(mxArray *samples, si1 *MED_directory, si1 *pass
         G_initialize_time_slice_m12(&slice);
 	slice.start_sample_number = min_samp;
 	slice.end_sample_number = max_samp;
-	flags = LH_READ_SLICE_SEGMENT_DATA_m12;  // read in time series indices (this could be made more efficient)
+	flags = (LH_READ_SLICE_SEGMENT_DATA_m12 | LH_MAP_ALL_SEGMENTS_m12);  // read in time series indices (this could be made more efficient)
 	chan = G_open_channel_m12(NULL, &slice, MED_directory, flags, password);  // threaded version
 	if (chan == NULL) {
 		if (globals_m12->password_data.processed == 0) {

@@ -181,7 +181,7 @@
 #define SGMT_v10_RECORD_FIELDS_DESCRIPTION_IDX_mat			16
 
 // Matlab Sgmt (v1.1) Record Structure
-#define NUMBER_OF_SGMT_v11_RECORD_FIELDS_mat				14
+#define NUMBER_OF_SGMT_v11_RECORD_FIELDS_mat				15
 #define SGMT_v11_RECORD_FIELD_NAMES_mat { \
 	"start_index", \
 	"start_time", \
@@ -196,6 +196,7 @@
 	"start_sample_number", \
 	"end_sample_number", \
 	"segment_number", \
+	"acquistion_channel_number", \
 	"description" \
 }
 #define SGMT_v11_RECORD_FIELDS_END_TIME_IDX_mat				8
@@ -203,7 +204,8 @@
 #define SGMT_v11_RECORD_FIELDS_START_SAMPLE_NUMBER_IDX_mat		10
 #define SGMT_v11_RECORD_FIELDS_END_SAMPLE_NUMBER_IDX_mat		11
 #define SGMT_v11_RECORD_FIELDS_SEGMENT_NUMBER_IDX_mat			12
-#define SGMT_v11_RECORD_FIELDS_DESCRIPTION_IDX_mat			13
+#define SGMT_v11_RECORD_FIELDS_ACQUISITION_CHANNEL_NUMBER_IDX_mat	13
+#define SGMT_v11_RECORD_FIELDS_DESCRIPTION_IDX_mat			14
 
 // Matlab Unknown Record Structure
 #define NUMBER_OF_UNKN_RECORD_FIELDS_mat	9

@@ -38,8 +38,8 @@
         "session_end_time", \
         "session_start_time_string", \
         "session_end_time_string", \
-        "absolute_start_sample_number", \
-        "absolute_end_sample_number", \
+        "start_sample_number", \
+        "end_sample_number", \
         "session_name", \
         "channel_name", \
         "anonymized_subject_ID", \
@@ -79,8 +79,8 @@
 #define METADATA_FIELDS_SESSION_END_TIME_UUTC_IDX_mat                   2
 #define METADATA_FIELDS_SESSION_START_TIME_STRING_IDX_mat               3
 #define METADATA_FIELDS_SESSION_END_TIME_STRING_IDX_mat                 4
-#define METADATA_FIELDS_ABSOLUTE_START_SAMPLE_NUMBER_IDX_mat            5
-#define METADATA_FIELDS_ABSOLUTE_END_SAMPLE_NUMBER_IDX_mat              6
+#define METADATA_FIELDS_START_SAMPLE_NUMBER_IDX_mat			5
+#define METADATA_FIELDS_END_SAMPLE_NUMBER_IDX_mat			6
 #define METADATA_FIELDS_SESSION_NAME_IDX_mat                            7
 #define METADATA_FIELDS_CHANNEL_NAME_IDX_mat                            8
 #define METADATA_FIELDS_ANONYMIZED_SUBJECT_ID_IDX_mat                 	9
@@ -255,7 +255,7 @@
 #define SGMT_v10_RECORD_FIELDS_DESCRIPTION_IDX_mat			15
 
 // Matlab Sgmt (v1.1) Record Structure
-#define NUMBER_OF_SGMT_v11_RECORD_FIELDS_mat				13
+#define NUMBER_OF_SGMT_v11_RECORD_FIELDS_mat				14
 #define SGMT_v11_RECORD_FIELD_NAMES_mat { \
 	"start_time", \
 	"start_time_string", \
@@ -269,6 +269,7 @@
 	"start_sample_number", \
 	"end_sample_number", \
 	"segment_number", \
+	"acquistion_channel_number", \
 	"description" \
 }
 #define SGMT_v11_RECORD_FIELDS_END_TIME_IDX_mat				7
@@ -276,7 +277,8 @@
 #define SGMT_v11_RECORD_FIELDS_START_SAMPLE_NUMBER_IDX_mat		9
 #define SGMT_v11_RECORD_FIELDS_END_SAMPLE_NUMBER_IDX_mat		10
 #define SGMT_v11_RECORD_FIELDS_SEGMENT_NUMBER_IDX_mat			11
-#define SGMT_v11_RECORD_FIELDS_DESCRIPTION_IDX_mat			12
+#define SGMT_v11_RECORD_FIELDS_ACQUISITION_CHANNEL_NUMBER_IDX_mat	12
+#define SGMT_v11_RECORD_FIELDS_DESCRIPTION_IDX_mat			13
 
 // Matlab Unknown Record Structure
 #define NUMBER_OF_UNKN_RECORD_FIELDS_mat	8

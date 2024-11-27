@@ -49,11 +49,11 @@ void    mexFunction(si4 nlhs, mxArray *plhs[], si4 nrhs, const mxArray *prhs[])
 		// register exit function
 		mexAtExit(mexExitFunction);
 		
-		// adjust process limits
+		// adjust process limits (called this way, these functions do not require medlib to be initialized)
 		PROC_adjust_open_file_limit_m12(MAX_OPEN_FILES_m12(MAX_CHANNELS, 1), FALSE_m12);
 		PROC_increase_process_priority_m12(FALSE_m12, FALSE_m12);
 		
-		// initialze medlib
+		// initialize medlib
 		G_initialize_medlib_m12(FALSE_m12, FALSE_m12);
 		
 		loaded = TRUE_m12;
@@ -320,10 +320,14 @@ void    mexFunction(si4 nlhs, mxArray *plhs[], si4 nrhs, const mxArray *prhs[])
 	if (med_matrix != NULL)
 		med_matrix->data = med_matrix->range_minima = med_matrix->range_maxima = NULL;  // this memory belongs Matlab structure, must be allocated with each call
 	if (persist_mode & PERSIST_CLOSE) {
-		G_free_session_m12(med_session, TRUE_m12);  // resets session globals (no not need to free until function unloaded)
-		med_session = NULL;
-		DM_free_matrix_m12(med_matrix, TRUE_m12);
-		med_matrix = NULL;
+		if (med_session != NULL) {
+			G_free_session_m12(med_session, TRUE_m12);  // resets session globals (no not need to free until function unloaded)
+			med_session = NULL;
+		}
+		if (med_matrix != NULL) {
+			DM_free_matrix_m12(med_matrix, TRUE_m12);
+			med_matrix = NULL;
+		}
 	}
 
         return;
@@ -355,7 +359,7 @@ mxArray	*matrix_MED(void *file_list, si4 n_files, si8 start_time, si8 end_time, 
 	G_initialize_time_slice_m12(&slice);
 	slice.start_time = start_time;
 	slice.end_time = end_time;
-	flags = (LH_INCLUDE_TIME_SERIES_CHANNELS_m12 | LH_READ_SLICE_SEGMENT_DATA_m12 | LH_READ_SLICE_SESSION_RECORDS_m12 | LH_READ_SLICE_SEGMENTED_SESS_RECS_m12);
+	flags = (LH_READ_SLICE_SEGMENT_DATA_m12 | LH_READ_SLICE_SESSION_RECORDS_m12 | LH_READ_SLICE_SEGMENTED_SESS_RECS_m12);
 	if (persist_mode & PERSIST_CLOSE) {
 		if (sess == NULL)
 			flags |= LH_NO_CPS_CACHING_m12;  // caching not efficient for single reads
@@ -370,12 +374,11 @@ mxArray	*matrix_MED(void *file_list, si4 n_files, si8 start_time, si8 end_time, 
 			return(mxCreateLogicalScalar((mxLogical) 1));
 		}
 		action_str = "open";
-	} else {
-		//	printf_m12("%s(%d): set back to threaded\n", __FUNCTION__, __LINE__);
-		//	sess = G_read_session_nt_m12(sess, &slice, file_list, n_files, flags, password);  // non-threaded version
-		sess = G_read_session_m12(sess, &slice, file_list, n_files, flags, password);  // threaded version
+	} else if (sess == NULL) {  // PERSIST_READ, PERSIST_READ_CLOSE
+		sess = G_open_session_m12(sess, &slice, file_list, n_files, flags, password);  // threaded version
 		action_str = "read";
 	}
+
 	if (sess == NULL) {
 		if (globals_m12->password_data.processed == 0) {
 			G_warning_message_m12("\n%s():\nCannot %s session => no matching input files.\n", __FUNCTION__, action_str);
@@ -413,6 +416,8 @@ mxArray	*matrix_MED(void *file_list, si4 n_files, si8 start_time, si8 end_time, 
 		tmp_mxa = mxCreateNumericArray(n_dims, dims, mxDOUBLE_CLASS, mxREAL);
 		mxSetFieldByNumber(mat_raw_page, 0, MATRIX_MAXIMA_IDX_mat, tmp_mxa);
 		maxs = (void *) mxGetPr(tmp_mxa);
+	} else {
+		mins = maxs = NULL;
 	}
 
 	// Create DM matrix structure
@@ -421,11 +426,7 @@ mxArray	*matrix_MED(void *file_list, si4 n_files, si8 start_time, si8 end_time, 
 	dm->channel_count = n_chans;
 	dm->sample_count = n_out_samps;
 	dm->data_bytes = (n_out_samps * n_chans) << 3;
-	dm->data = samps;  // Matlab allocated memory
-	if (trace_ranges == TRUE_m12) {
-		dm->range_minima = mins;  // Matlab allocated pointer
-		dm->range_maxima = maxs;  // Matlab allocated pointer
-	}
+	dm->data = samps;  // Matlab allocated pointer
 	dm->flags = ( DM_TYPE_SF8_m12 | DM_FMT_CHANNEL_MAJOR_m12 | DM_EXTMD_SAMP_COUNT_m12 | DM_EXTMD_RELATIVE_LIMITS_m12 | DM_DSCNT_CONTIG_m12 | DM_INTRP_UP_MAKIMA_DN_LINEAR_m12 );
 	if (antialias == TRUE_m12)
 		dm->flags |= DM_FILT_ANTIALIAS_m12;
@@ -433,9 +434,11 @@ mxArray	*matrix_MED(void *file_list, si4 n_files, si8 start_time, si8 end_time, 
 		dm->flags |= DM_DETREND_m12;
 	if (trace_ranges == TRUE_m12)
 		dm->flags |= DM_TRACE_RANGES_m12;
+	dm->range_minima = mins;  // Matlab allocated pointer, or NULL
+	dm->range_maxima = maxs;  // Matlab allocated pointer, or NULL
 
 	// Build matrix
-	dm = DM_get_matrix_m12(dm, sess, NULL, FALSE_m12);
+	dm = DM_get_matrix_m12(dm, sess, &slice, FALSE_m12);
 	if (dm == NULL) {
 		G_warning_message_m12("\n%s():\nError generating matrix.\n", __FUNCTION__);
 		mexExitFunction();
@@ -957,12 +960,24 @@ mxArray	*fill_record(RECORD_HEADER_m12 *rh, DATA_MATRIX_m12 *dm)
 					tmp_mxa = mxCreateNumericArray(n_dims, dims, mxINT32_CLASS, mxREAL);
 					*((si4 *) mxGetPr(tmp_mxa)) = Sgmt_v11->segment_number;
 					mxSetFieldByNumber(mat_record, 0, SGMT_v11_RECORD_FIELDS_SEGMENT_NUMBER_IDX_mat, tmp_mxa);
+					// acquisition channel number
+					if (Sgmt_v11->acquisition_channel_number == REC_Sgmt_v11_ACQUISITION_CHANNEL_NUMBER_ALL_CHANNELS_m12) {
+						tmp_mxa = mxCreateString("all channels");
+					} else {
+						tmp_mxa = mxCreateNumericArray(n_dims, dims, mxINT32_CLASS, mxREAL);
+						*((si4 *) mxGetPr(tmp_mxa)) = Sgmt_v11->acquisition_channel_number;
+					}
+					mxSetFieldByNumber(mat_record, 0, SGMT_v11_RECORD_FIELDS_ACQUISITION_CHANNEL_NUMBER_IDX_mat, tmp_mxa);
 					// description
-					text = Sgmt_v11->description;
-					if (*text)
-						tmp_mxa = mxCreateString(text);
-					else
+					if (rh->total_record_bytes > (RECORD_HEADER_BYTES_m12 + REC_Sgmt_v10_BYTES_m12)) {
+						text = (si1 *) rh + RECORD_HEADER_BYTES_m12 + REC_Sgmt_v10_BYTES_m12;
+						if (*text)
+							tmp_mxa = mxCreateString(text);
+						else
+							tmp_mxa = mxCreateString("<no description>");
+					} else {
 						tmp_mxa = mxCreateString("<no description>");
+					}
 					mxSetFieldByNumber(mat_record, 0, SGMT_v11_RECORD_FIELDS_DESCRIPTION_IDX_mat, tmp_mxa);
 					break;
 				}
