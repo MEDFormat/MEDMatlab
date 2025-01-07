@@ -34,14 +34,12 @@ void	mexExitFunction(void)
 // Mex gateway routine
 void    mexFunction(si4 nlhs, mxArray *plhs[], si4 nrhs, const mxArray *prhs[])
 {
-	TERN_m12                	samples_as_singles, metadata, records, contigua;
-        void                    	*file_list;
-	ui1				persist_mode;
-        si1                     	password[PASSWORD_BYTES_m12 + 1], temp_str[16], **file_list_p;
-        si1                     	index_channel[FULL_FILE_NAME_BYTES_m12];
-        si4                     	i, len, max_len, n_files;
-        si8                     	start_time, end_time, start_index, end_index, tmp_si8;
-        mxArray                 	*mx_cell_p, *mat_sess;
+        si1                     	temp_str[16], **MED_paths_p;
+        si4                     	i, len, max_len;
+        si8                     	tmp_si8;
+	const mxArray			*rps;
+	C_RPS				crps;
+        mxArray                 	*tmp_mxa, *mx_cell_p, *mat_sess;
 
 	
 	// function loaded
@@ -60,332 +58,355 @@ void    mexFunction(si4 nlhs, mxArray *plhs[], si4 nrhs, const mxArray *prhs[])
 	}
 	
 	//  check for proper number of arguments
-	if (nlhs != 1)
-		mexErrMsgTxt("One output required: MED session structure, or logical value\n");
-	plhs[0] = mxCreateLogicalScalar((mxLogical) 0);  // set "false" return value for subsequent errors
-	if (nrhs < 1 || nrhs > 12)
-		mexErrMsgTxt("One to 12 inputs required: file_list, [start_time], [end_time], [start_index], [start_index], [password], [index_channel], [samples_as_singles], [persistence_mode], [metadata], [records], [contigua]\n");
+	if (nlhs != 1) {
+		if (nrhs != 1)
+			mexErrMsgTxt("One input: read_MED parameter structure\nOne output: read_MED data structure\n");
+		else
+			mexErrMsgTxt("One output: read_MED data structure\n");
+	}
+	plhs[0] = mxCreateLogicalScalar((mxLogical) 0);  // set "false" return value for any subsequent errors
+	if (nrhs != 1)
+		mexErrMsgTxt("One input: read_MED parameter structure\n");
+	rps = prhs[0];
+	if (mxIsStruct(rps) == 0)
+		mexErrMsgTxt("Input must be a read_MED parameter structure\n");
 
 	// get persistence mode if passed
-	persist_mode = PERSIST_NONE; // default (== PERSIST_READ_CLOSE)
-	if (nrhs == 9) {
-		if (mxIsEmpty(prhs[8]) == 0) {
-			if (mxGetClassID(prhs[8]) == mxCHAR_CLASS) {  // passed char array
-				mxGetString(prhs[8], temp_str, 16);
-				switch (*temp_str) {
-					case 'c':  // "close"
-					case 'C':
-						persist_mode = PERSIST_CLOSE;
-						break;
-					case 'o':  // "open"
-					case 'O':
-						persist_mode = PERSIST_OPEN;
-						break;
-					case 'r':  // "read"
-					case 'R':
-						if (*(temp_str + 4) == 0)  // "read" only
-							persist_mode = PERSIST_READ;
-						else if (*(temp_str + 5) == 'n' || *(temp_str + 5) == 'N')  // "read new"
-							persist_mode = PERSIST_READ_NEW;
-						// else leave as "read close" (default)
-						break;
-					default:  // includes "none" (default)
-						break;
-				}
-			} else {  // passed number
-				tmp_si8 = get_si8_scalar(prhs[8]);
-				if (tmp_si8 < 0 || tmp_si8 > 6 || tmp_si8 == 3)
-					mexErrMsgTxt("Invalid persist mode (input 9)\n");
-				if (tmp_si8)  // if zero, leave as 6 ("read close" == "none")
-					persist_mode = (ui1) tmp_si8;
+	crps.persist_mode = PERSIST_READ_CLOSE;  // default
+	tmp_mxa = mxGetFieldByNumber(rps, 0, RPS_PERSISTENCE_IDX);
+	if (mxIsEmpty(tmp_mxa) == 0) {
+		if (mxGetClassID(tmp_mxa) == mxCHAR_CLASS) {  // passed char array
+			mxGetString(tmp_mxa, temp_str, 16);
+			switch (*temp_str) {
+				case 'c':  // "close"
+				case 'C':
+					crps.persist_mode = PERSIST_CLOSE;
+					break;
+				case 'o':  // "open"
+				case 'O':
+					crps.persist_mode = PERSIST_OPEN;
+					break;
+				case 'r':  // "read"
+				case 'R':
+					if (*(temp_str + 4) == 0)  // "read" only
+						crps.persist_mode = PERSIST_READ;
+					else if (*(temp_str + 5) == 'n' || *(temp_str + 5) == 'N')  // "read new"
+						crps.persist_mode = PERSIST_READ_NEW;
+					// else leave as "read close" (default)
+					break;
+				default:  // includes "none" (default)
+					break;
 			}
+		} else {  // passed number
+			tmp_si8 = get_si8_scalar(tmp_mxa);
+			if (tmp_si8 == PERSIST_NONE)  // none == read_close
+				tmp_si8 = PERSIST_READ_CLOSE;
+			if (tmp_si8 < PERSIST_OPEN || tmp_si8 > PERSIST_READ_CLOSE || tmp_si8 == 3)  // "3" not valid
+				mexErrMsgTxt("Invalid 'Persist' mode\n");
+			crps.persist_mode = (ui1) tmp_si8;
 		}
 	}
-	
-	if (persist_mode & PERSIST_OPEN || persist_mode == PERSIST_CLOSE) {
+
+	if (crps.persist_mode & PERSIST_OPEN || crps.persist_mode == PERSIST_CLOSE) {
 		if (med_sess != NULL) {  // free session
 			G_free_session_m12(med_sess, TRUE_m12);
 			med_sess = NULL;
-			if (persist_mode == PERSIST_CLOSE) {  // set return to "true" for session closed
+			if (crps.persist_mode == PERSIST_CLOSE) {  // set return to "true" for session closed
 				mxDestroyArray(plhs[0]);
 				plhs[0] = mxCreateLogicalScalar((mxLogical) 1);
 			}
 		}
-		if (persist_mode == PERSIST_CLOSE)
+		if (crps.persist_mode == PERSIST_CLOSE)
 			return;
 	}
 	
-        // get the input file name(s) (argument 1)
-	n_files = max_len = 0;
-	if (mxIsEmpty(prhs[0]) == 1 && med_sess == NULL)
-		mexErrMsgTxt("No input files specified\n");
-        if (mxGetClassID(prhs[0]) == mxCHAR_CLASS) {
-                max_len = mxGetNumberOfElements(prhs[0]); // Get the length of the input string
+	// check data parameter
+	crps.n_files = max_len = 0;
+	tmp_mxa = mxGetFieldByNumber(rps, 0, RPS_DATA_IDX);
+	if (mxIsEmpty(tmp_mxa) == 1)
+		mexErrMsgTxt("'Data' element is not specified\n");
+	if (mxGetClassID(tmp_mxa) == mxCHAR_CLASS) {
+		max_len = mxGetNumberOfElements(tmp_mxa); // get the length of the input string
 		if (max_len > FULL_FILE_NAME_BYTES_m12)
-			mexErrMsgTxt("'file_list' (input 1) is too long\n");
-        } else if (mxGetClassID(prhs[0]) == mxCELL_CLASS) {
-                n_files = mxGetNumberOfElements(prhs[0]);
-		if (n_files == 0)
-			mexErrMsgTxt("'file_list' (input 1) cell array contains no entries\n");
-                for (i = max_len = 0; i < n_files; ++i) {
-                        mx_cell_p = mxGetCell(prhs[0], i);
+			mexErrMsgTxt("'Data' path is too long\n");
+	} else if (mxGetClassID(tmp_mxa) == mxCELL_CLASS) {
+		crps.n_files = mxGetNumberOfElements(tmp_mxa);
+		if (crps.n_files == 0)
+			mexErrMsgTxt("'Data' cell array contains no entries\n");
+		for (i = max_len = 0; i < crps.n_files; ++i) {
+			mx_cell_p = mxGetCell(tmp_mxa, i);
 			if (mxGetClassID(mx_cell_p) != mxCHAR_CLASS)
-				mexErrMsgTxt("Elements of file_list cell array must be char arrays\n");
-                        len = mxGetNumberOfElements(mx_cell_p); // Get the length of the input string
-                        if (len > FULL_FILE_NAME_BYTES_m12)
-				mexErrMsgTxt("'file_list' (input 1) is too long\n");
-                        if (len > max_len)
-                                max_len = len;
-                }
-        } else {
-		mexErrMsgTxt("'file_list' (input 1) must be a string or cell array\nStrings may include regular expressions (regex)\n");
-        }
+				mexErrMsgTxt("Elements of 'Data' cell array must be char arrays\n");
+			len = mxGetNumberOfElements(mx_cell_p); // get the length of the input string
+			if (len > FULL_FILE_NAME_BYTES_m12)
+				mexErrMsgTxt("One of the 'Data' paths is too long\n");
+			if (len > max_len)
+				max_len = len;
+		}
+	} else {
+		mexErrMsgTxt("'Data' must be a char array or cell array of char arrays\Elements may include regular expressions (regex)\n");
+	}
 	max_len += TYPE_BYTES_m12;  // add room for med type extension, in case not included
-	
-        // start_time
-        start_time = UUTC_NO_ENTRY_m12;
-        if (nrhs > 1) {
-                if (mxIsEmpty(prhs[1]) == 0) {
-                        if (mxGetClassID(prhs[1]) == mxCHAR_CLASS) {
-				mxGetString(prhs[1], temp_str, 16);
-                                if (strcmp(temp_str, "start") == 0)
-                                        start_time = BEGINNING_OF_TIME_m12;
-                                else
-					mexErrMsgTxt("'start_time' (input 2) can be specified as 'start' (default), or an integer\n");
-                        } else {
-                                start_time = get_si8_scalar(prhs[1]);
-                        }
-                }
-        }
-        
-        // end_time
-        end_time = UUTC_NO_ENTRY_m12;
-        if (nrhs > 2) {
-                if (mxIsEmpty(prhs[2]) == 0) {
-                        if (mxGetClassID(prhs[2]) == mxCHAR_CLASS) {
-				mxGetString(prhs[2], temp_str, 16);
-                                if (strcmp(temp_str, "end") == 0)
-                                        end_time = END_OF_TIME_m12;
+
+	// get extents mode
+	crps.extents_mode = EXTENTS_MODE_TIME;
+	tmp_mxa = mxGetFieldByNumber(rps, 0, RPS_EXTENTS_MODE_IDX);
+	if (mxIsEmpty(tmp_mxa) == 0) {
+		if (mxGetClassID(tmp_mxa) == mxCHAR_CLASS) {  // passed char array
+			mxGetString(tmp_mxa, temp_str, 16);
+			switch (*temp_str) {
+				case 't':  // "time"
+				case 'T':
+					crps.extents_mode = EXTENTS_MODE_TIME;
+					break;
+				case 'i':  // "indices"
+				case 'I':
+					crps.extents_mode = EXTENTS_MODE_INDICES;
+					break;
+				default:
+					mexErrMsgTxt("Invalid 'ExtentsMode' type\n");
+					break;
+			}
+		} else {  // passed number
+			tmp_si8 = get_si8_scalar(tmp_mxa);
+			if (tmp_si8 < EXTENTS_MODE_TIME || tmp_si8 > EXTENTS_MODE_INDICES)
+				mexErrMsgTxt("Invalid 'ExtentsMode' type\n");
+			crps.extents_mode = tmp_si8;
+		}
+	}
+
+	// get the start limit
+	crps.start_time = UUTC_NO_ENTRY_m12;
+	crps.start_index = SAMPLE_NUMBER_NO_ENTRY_m12;
+	tmp_mxa = mxGetFieldByNumber(rps, 0, RPS_START_IDX);
+	if (mxIsEmpty(tmp_mxa) == 0) {
+		if (mxGetClassID(tmp_mxa) == mxCHAR_CLASS) {
+			len = mxGetNumberOfElements(tmp_mxa) + 1; // get the length of the input string
+			if (len <= 16)
+				mxGetString(tmp_mxa, temp_str, len);
+			else
+				mexErrMsgTxt("'Start' can be specified as 'start', or an integer\n");
+			if (strcmp(temp_str, "start") == 0) {
+				if (crps.extents_mode == EXTENTS_MODE_TIME)
+					crps.start_time = BEGINNING_OF_TIME_m12;
 				else
-					mexErrMsgTxt("'end_time' (input 3) can be specified as 'end' (default), or an integer\n");
-                        } else {
-                                end_time = get_si8_scalar(prhs[2]);
-                        }
-                }
-        }
-
-        // start_index
-        start_index = SAMPLE_NUMBER_NO_ENTRY_m12;
-        if (nrhs > 3) {
-                if (mxIsEmpty(prhs[3]) == 0) {
-                        if (mxGetClassID(prhs[3]) == mxCHAR_CLASS) {
-				mxGetString(prhs[3], temp_str, 16);
-                                if (strcmp(temp_str, "start") == 0)
-                                        start_index = BEGINNING_OF_SAMPLE_NUMBERS_m12;
-                                else
-					mexErrMsgTxt("'start_index' (input 4) can be specified as 'start', or a positive integer\n");
-                        } else {
-                                start_index = get_si8_scalar(prhs[3]);
-                                // convert to zero-based indexing
-                                if (start_index != SAMPLE_NUMBER_NO_ENTRY_m12 && start_index != BEGINNING_OF_SAMPLE_NUMBERS_m12)
-                                        --start_index;
-                        }
-                }
-        }
-
-        // end_index
-        end_index = SAMPLE_NUMBER_NO_ENTRY_m12;
-        if (nrhs > 4) {
-                if (mxIsEmpty(prhs[4]) == 0) {
-                        if (mxGetClassID(prhs[4]) == mxCHAR_CLASS) {
-				mxGetString(prhs[4], temp_str, 16);
-                                if (strcmp(temp_str, "end") == 0)
-                                        end_index = END_OF_SAMPLE_NUMBERS_m12;
-                                else
-					mexErrMsgTxt("'end_index' (input 5) can be specified as 'end', or an integer\n");
-                        } else {
-                                end_index = get_si8_scalar(prhs[4]);
-                                // convert to zero-based indexing
-                                if (end_index != SAMPLE_NUMBER_NO_ENTRY_m12 && end_index != END_OF_SAMPLE_NUMBERS_m12)
-                                        --end_index;
-                        }
-                }
-        }
-
-        // password
-        *password = 0;
-        if (nrhs > 5) {
-                if (mxIsEmpty(prhs[5]) == 0) {
-                        if (mxGetClassID(prhs[5]) == mxCHAR_CLASS) {
-                                len = mxGetNumberOfElements(prhs[5]); // Get the length of the input string
-                                if (len > (PASSWORD_BYTES_m12))  // allow full 16 bytes for password
-					mexErrMsgTxt("'password' (input 6) is too long\n");
-                                else
-                                        mxGetString(prhs[5], password, len + 1);
-                        } else {
-				mexErrMsgTxt("'password' (input 6) must be a string\n");
-                        }
-                }
-        }
-        
-        // index_channel
-        *index_channel = 0;
-        if (nrhs > 6) {
-                if (mxIsEmpty(prhs[6]) == 0) {
-                        if (mxGetClassID(prhs[6]) == mxCHAR_CLASS) {
-                                len = mxGetNumberOfElements(prhs[6]) + 1; // Get the length of the input string
-                                if (len > FULL_FILE_NAME_BYTES_m12)
-					mexErrMsgTxt("'index_channel' (input 7) is too long (first channel is default)\n");
-                                else
-                                        mxGetString(prhs[6], index_channel, len);
-                        } else {
-				mexErrMsgTxt("'undex_channel' (input 7) must be a string (first channel is default)\n");
-                        }
-                }
-        }
-
-        // samples_as_singles
-	samples_as_singles = FALSE_m12;
-        if (nrhs > 7) {
-                if (mxIsEmpty(prhs[7]) == 0) {
-			samples_as_singles = UNKNOWN_m12;
-			if (mxGetClassID(prhs[7]) == mxCHAR_CLASS) {
-				mxGetString(prhs[7], temp_str, 16);
-				if (*temp_str == 't' || *temp_str == 'T' || *temp_str == 'y' || *temp_str == 'Y' || *temp_str == '1')
-					samples_as_singles = TRUE_m12;
-				else if (*temp_str == 'f' || *temp_str == 'F' || *temp_str == 'n' || *temp_str == 'N' || *temp_str == '0')
-					samples_as_singles = FALSE_m12;
-			} else if (mxIsLogicalScalar(prhs[7])) {
-				if (mxIsLogicalScalarTrue(prhs[7]) == 1)
-					samples_as_singles = TRUE_m12;
-				 else
-					samples_as_singles = FALSE_m12;
-			 } else if (mxIsScalar(prhs[7])) {
-				 if (mxGetScalar(prhs[7]) == 1)
-					 samples_as_singles = TRUE_m12;
-				 else if (mxGetScalar(prhs[7]) == 0)
-					 samples_as_singles = FALSE_m12;
-			 }
-			if (samples_as_singles == UNKNOWN_m12)
-				mexErrMsgTxt("'samples_as_singles' (input 8) can be either true or false (default) only\n");
+					crps.start_index = BEGINNING_OF_SAMPLE_NUMBERS_m12;
+			} else {
+				mexErrMsgTxt("'Start' can be specified as 'start', or an integer\n");
+			}
+		} else {
+			if (crps.extents_mode == EXTENTS_MODE_TIME)
+				crps.start_time = get_si8_scalar(tmp_mxa);
+			else
+				crps.start_index = get_si8_scalar(tmp_mxa);
 		}
-        }
-		
-	// metadata
-	metadata = TRUE_m12;
-	if (nrhs > 9) {
-		if (mxIsEmpty(prhs[9]) == 0) {
-			metadata = UNKNOWN_m12;
-			if (mxGetClassID(prhs[9]) == mxCHAR_CLASS) {
-				mxGetString(prhs[9], temp_str, 16);
-				if (*temp_str == 't' || *temp_str == 'T' || *temp_str == 'y' || *temp_str == 'Y' || *temp_str == '1')
-					metadata = TRUE_m12;
-				else if (*temp_str == 'f' || *temp_str == 'F' || *temp_str == 'n' || *temp_str == 'N' || *temp_str == '0')
-					metadata = FALSE_m12;
-			} else if (mxIsLogicalScalar(prhs[9])) {
-				if (mxIsLogicalScalarTrue(prhs[9]) == 1)
-					metadata = TRUE_m12;
-				 else
-					metadata = FALSE_m12;
-			 } else if (mxIsScalar(prhs[9])) {
-				 if (mxGetScalar(prhs[9]) == 1)
-					 metadata = TRUE_m12;
-				 else if (mxGetScalar(prhs[9]) == 0)
-					 metadata = FALSE_m12;
-			 }
-			if (metadata == UNKNOWN_m12)
-				mexErrMsgTxt("'metadata' (input 10) can be either true (default) or false only\n");
+	}
+
+	// get the end limit
+	crps.end_time = UUTC_NO_ENTRY_m12;
+	crps.end_index = SAMPLE_NUMBER_NO_ENTRY_m12;
+	tmp_mxa = mxGetFieldByNumber(rps, 0, RPS_END_IDX);
+	if (mxIsEmpty(tmp_mxa) == 0) {
+		if (mxGetClassID(tmp_mxa) == mxCHAR_CLASS) {
+			len = mxGetNumberOfElements(tmp_mxa) + 1; // get the length of the input string
+			if (len <= 16)
+				mxGetString(tmp_mxa, temp_str, len);
+			else
+				mexErrMsgTxt("'End' can be specified as 'end', or an integer\n");
+			if (strcmp(temp_str, "end") == 0) {
+				if (crps.extents_mode == EXTENTS_MODE_TIME)
+					crps.end_time = END_OF_TIME_m12;
+				else
+					crps.end_index = END_OF_SAMPLE_NUMBERS_m12;
+			} else {
+				mexErrMsgTxt("'End' can be specified as 'end', or an integer\n");
+			}
+		} else {
+			if (crps.extents_mode == EXTENTS_MODE_TIME)
+				crps.end_time = get_si8_scalar(tmp_mxa);
+			else
+				crps.end_index = get_si8_scalar(tmp_mxa);
 		}
+	}
+
+	// get password
+	*crps.password = 0;
+	tmp_mxa = mxGetFieldByNumber(rps, 0, RPS_PASSWORD_IDX);
+	if (mxIsEmpty(tmp_mxa) == 0) {
+		if (mxGetClassID(tmp_mxa) == mxCHAR_CLASS) {
+			len = mxGetNumberOfElements(tmp_mxa) + 1; // get the length of the input string
+			if (len > PASSWORD_BYTES_m12)
+				mexErrMsgTxt("'Pass' is too long\n");
+			else
+				mxGetString(tmp_mxa, crps.password, len);
+		} else {
+			mexErrMsgTxt("'Passw' must be a char array\n");
+		}
+	}
+
+	// get index_channel
+	*crps.index_channel = 0;
+	tmp_mxa = mxGetFieldByNumber(rps, 0, RPS_INDEX_CHANNEL_IDX);
+	if (mxIsEmpty(tmp_mxa) == 0) {
+		if (mxGetClassID(tmp_mxa) == mxCHAR_CLASS) {
+			len = mxGetNumberOfElements(tmp_mxa) + 1; // get the length of the input string
+			if (len > FULL_FILE_NAME_BYTES_m12)
+				mexErrMsgTxt("'IdxChan' is too long\n");
+			else
+				mxGetString(tmp_mxa, crps.index_channel, len);
+		} else {
+			mexErrMsgTxt("'IdxChan' must be a string\n");
+		}
+	}
+
+	// get format
+	crps.format = FORMAT_DOUBLE;
+	tmp_mxa = mxGetFieldByNumber(rps, 0, RPS_FORMAT_IDX);
+	if (mxIsEmpty(tmp_mxa) == 0) {
+		if (mxGetClassID(tmp_mxa) == mxCHAR_CLASS) {
+			len = mxGetNumberOfElements(tmp_mxa) + 1;  // get the length of the input string
+			if (len <= 16)
+				mxGetString(tmp_mxa, temp_str, len);
+			else
+				mexErrMsgTxt("Invalid 'Format' type\n");
+			if (strcmp(temp_str, "double") == 0)
+				crps.format = FORMAT_DOUBLE;
+			else if (strcmp(temp_str, "single") == 0)
+				crps.format = FORMAT_SINGLE;
+			else if (strcmp(temp_str, "int32") == 0)
+				crps.format = FORMAT_INT32;
+			else if (strcmp(temp_str, "int16") == 0)
+				crps.format = FORMAT_INT16;
+			else
+				mexErrMsgTxt("Invalid 'Format' type\n");
+		} else {
+			tmp_si8 = get_si8_scalar(tmp_mxa);
+			if (tmp_si8 < FORMAT_DOUBLE || tmp_si8 > FORMAT_INT16)
+				mexErrMsgTxt("Invalid 'Format' type\n");
+			crps.format = tmp_si8;
+		}
+	}
+	
+	// get filter
+	crps.filter = FILT_NONE;
+	tmp_mxa = mxGetFieldByNumber(rps, 0, RPS_FILTER_IDX);
+	if (mxIsEmpty(tmp_mxa) == 0) {
+		if (mxGetClassID(tmp_mxa) == mxCHAR_CLASS) {
+			len = mxGetNumberOfElements(tmp_mxa) + 1;  // get the length of the input string
+			if (len <= 16)
+				mxGetString(tmp_mxa, temp_str, len);
+			else
+				mexErrMsgTxt("Invalid 'Filt' type\n");
+			if (strcmp(temp_str, "none") == 0)
+				crps.filter = FILT_NONE;
+			else if (strcmp(temp_str, "lowpass") == 0)
+				crps.filter = FILT_LOWPASS;
+			else if (strcmp(temp_str, "highpass") == 0)
+				crps.filter = FILT_HIGHPASS;
+			else if (strcmp(temp_str, "bandpass") == 0)
+				crps.filter = FILT_BANDPASS;
+			else if (strcmp(temp_str, "bandstop") == 0)
+				crps.filter = FILT_BANDSTOP;
+			else
+				mexErrMsgTxt("Invalid 'Filt' type\n");
+		} else {
+			tmp_si8 = get_si8_scalar(tmp_mxa);
+			if (tmp_si8 < FILT_NONE || tmp_si8 > FILT_BANDSTOP)
+				mexErrMsgTxt("Invalid 'Filt' type\n");
+			crps.filter = tmp_si8;
+		}
+	}
+
+	// get low cutoff
+	crps.low_cutoff = (sf8) -1.0;
+	tmp_mxa = mxGetFieldByNumber(rps, 0, RPS_LOW_CUTOFF_IDX);
+	if (mxIsEmpty(tmp_mxa) == 0)
+		crps.low_cutoff = *((sf8 *) mxGetPr(tmp_mxa));
+
+	// get high cutoff
+	crps.high_cutoff = (sf8) -1.0;
+	tmp_mxa = mxGetFieldByNumber(rps, 0, RPS_HIGH_CUTOFF_IDX);
+	if (mxIsEmpty(tmp_mxa) == 0)
+		crps.high_cutoff = *((sf8 *) mxGetPr(tmp_mxa));
+	
+	// check filter cutoffs
+	if (crps.filter >= FILT_LOWPASS) {
+		if (crps.filter == FILT_HIGHPASS || crps.filter == FILT_BANDPASS || crps.filter == FILT_BANDSTOP)
+			if (crps.high_cutoff == (sf8) 0.0)
+				mexErrMsgTxt("'LowCut' is required for the specified filter type\n");
+		if (crps.filter == FILT_LOWPASS || crps.filter == FILT_BANDPASS || crps.filter == FILT_BANDSTOP)
+			if (crps.high_cutoff == (sf8) 0.0)
+				mexErrMsgTxt("'HighCut' is required for the specified filter type\n");
+	}
+
+	// get metadata
+	crps.metadata = TRUE_m12;
+	tmp_mxa = mxGetFieldByNumber(rps, 0, RPS_METADATA_IDX);
+	if (mxIsEmpty(tmp_mxa) == 0) {
+		crps.metadata = get_logical(tmp_mxa);
+		if (crps.metadata == UNKNOWN_m12)
+			mexErrMsgTxt("'Metadata' can be either true or false\n");
 	}
 
 	// records
-	records = TRUE_m12;
-	if (nrhs > 10) {
-		if (mxIsEmpty(prhs[10]) == 0) {
-			records = UNKNOWN_m12;
-			if (mxGetClassID(prhs[10]) == mxCHAR_CLASS) {
-				mxGetString(prhs[10], temp_str, 16);
-				if (*temp_str == 't' || *temp_str == 'T' || *temp_str == 'y' || *temp_str == 'Y' || *temp_str == '1')
-					records = TRUE_m12;
-				else if (*temp_str == 'f' || *temp_str == 'F' || *temp_str == 'n' || *temp_str == 'N' || *temp_str == '0')
-					records = FALSE_m12;
-			} else if (mxIsLogicalScalar(prhs[10])) {
-				if (mxIsLogicalScalarTrue(prhs[10]) == 1)
-					records = TRUE_m12;
-				 else
-					records = FALSE_m12;
-			 } else if (mxIsScalar(prhs[10])) {
-				 if (mxGetScalar(prhs[10]) == 1)
-					 records = TRUE_m12;
-				 else if (mxGetScalar(prhs[10]) == 0)
-					 records = FALSE_m12;
-			 }
-			if (records == UNKNOWN_m12)
-				mexErrMsgTxt("'records' (input 11) can be either true (default) or false only\n");
-		}
+	crps.records = TRUE_m12;
+	tmp_mxa = mxGetFieldByNumber(rps, 0, RPS_RECORDS_IDX);
+	if (mxIsEmpty(tmp_mxa) == 0) {
+		crps.records = get_logical(tmp_mxa);
+		if (crps.records == UNKNOWN_m12)
+			mexErrMsgTxt("'Records' can be either true or false\n");
 	}
 
 	// contigua
-	contigua = TRUE_m12;
-	if (nrhs > 11) {
-		if (mxIsEmpty(prhs[11]) == 0) {
-			contigua = UNKNOWN_m12;
-			if (mxGetClassID(prhs[11]) == mxCHAR_CLASS) {
-				mxGetString(prhs[11], temp_str, 16);
-				if (*temp_str == 't' || *temp_str == 'T' || *temp_str == 'y' || *temp_str == 'Y' || *temp_str == '1')
-					contigua = TRUE_m12;
-				else if (*temp_str == 'f' || *temp_str == 'F' || *temp_str == 'n' || *temp_str == 'N' || *temp_str == '0')
-					contigua = FALSE_m12;
-			} else if (mxIsLogicalScalar(prhs[11])) {
-				if (mxIsLogicalScalarTrue(prhs[11]) == 1)
-					contigua = TRUE_m12;
-				 else
-					contigua = FALSE_m12;
-			 } else if (mxIsScalar(prhs[11])) {
-				 if (mxGetScalar(prhs[11]) == 1)
-					contigua = TRUE_m12;
-				 else if (mxGetScalar(prhs[11]) == 0)
-					contigua = FALSE_m12;
-			 }
-			if (contigua == UNKNOWN_m12)
-				mexErrMsgTxt("'contigua' (input 12) can be either true (default) or false only\n");
-		}
+	crps.contigua = TRUE_m12;
+	tmp_mxa = mxGetFieldByNumber(rps, 0, RPS_CONTIGUA_IDX);
+	if (mxIsEmpty(tmp_mxa) == 0) {
+		crps.contigua = get_logical(tmp_mxa);
+		if (crps.contigua == UNKNOWN_m12)
+			mexErrMsgTxt("'Contigua' can be either true or false\n");
 	}
 
 	// create input file list
-	file_list = NULL;
-	switch (n_files) {
+	crps.MED_paths = NULL;
+	tmp_mxa = mxGetFieldByNumber(rps, 0, RPS_DATA_IDX);
+	switch (crps.n_files) {
 		case 0:  // single string passed
-			file_list = calloc_m12((size_t) max_len, sizeof(si1), __FUNCTION__, USE_GLOBAL_BEHAVIOR_m12);
-			mxGetString(prhs[0], (si1 *) file_list, max_len);
+			crps.MED_paths = calloc_m12((size_t) max_len, sizeof(si1), __FUNCTION__, USE_GLOBAL_BEHAVIOR_m12);
+			mxGetString(tmp_mxa, (si1 *) crps.MED_paths, max_len);
 			break;
 		case 1:   // single string passed in cell array
-			file_list = calloc_m12((size_t) max_len, sizeof(si1), __FUNCTION__, USE_GLOBAL_BEHAVIOR_m12);
-			mx_cell_p = mxGetCell(prhs[0], 0);
-			mxGetString(mx_cell_p, (si1 *) file_list, max_len);
-			n_files = 0;  // (indicates single string)
+			crps.MED_paths = calloc_m12((size_t) max_len, sizeof(si1), __FUNCTION__, USE_GLOBAL_BEHAVIOR_m12);
+			mx_cell_p = mxGetCell(tmp_mxa, 0);
+			mxGetString(mx_cell_p, (si1 *) crps.MED_paths, max_len);
+			crps.n_files = 0;  // (indicates single string)
 			break;
 		default:  // multiple strings in cell array
-			file_list = (void *) calloc_2D_m12((size_t) n_files, (size_t) max_len, sizeof(si1), __FUNCTION__, USE_GLOBAL_BEHAVIOR_m12);
-			file_list_p = (si1 **) file_list;
-			for (i = 0; i < n_files; ++i) {
-				mx_cell_p = mxGetCell(prhs[0], i);
-				mxGetString(mx_cell_p, file_list_p[i], max_len);
+			crps.MED_paths = (void *) calloc_2D_m12((size_t) crps.n_files, (size_t) max_len, sizeof(si1), __FUNCTION__, USE_GLOBAL_BEHAVIOR_m12);
+			MED_paths_p = (si1 **) crps.MED_paths;
+			for (i = 0; i < crps.n_files; ++i) {
+				mx_cell_p = mxGetCell(tmp_mxa, i);
+				mxGetString(mx_cell_p, MED_paths_p[i], max_len);
 			}
 			break;
 	}
-			
-        // get out of here
-	mat_sess = read_MED(file_list, n_files, start_time, end_time, start_index, end_index, password, index_channel, samples_as_singles, persist_mode, metadata, records, contigua);
+
+        // read MED
+	mat_sess = read_MED(&crps);
 	if (mat_sess != NULL) {
 		mxDestroyArray(plhs[0]);
+		// set  status
+		if (crps.persist_mode == PERSIST_READ_CLOSE)  // "close" handled on entry, returns logical true
+			tmp_mxa = mxCreateString("closed");
+		else
+			tmp_mxa = mxCreateString("open");
+		mxSetFieldByNumber(mat_sess, 0, SESSION_FIELDS_STATUS_IDX_mat, tmp_mxa);
 		plhs[0] = mat_sess;
 	}
 
         // clean up
-	free_m12(file_list, __FUNCTION__);
+	free_m12(crps.MED_paths, __FUNCTION__);
 	
-	if (persist_mode & PERSIST_CLOSE) {
+	if (crps.persist_mode & PERSIST_CLOSE) {
 		if (med_sess != NULL) {
 			G_free_session_m12(med_sess, TRUE_m12);  // resets session globals (no not need to free until function unloaded)
 			med_sess = NULL;
@@ -396,70 +417,82 @@ void    mexFunction(si4 nlhs, mxArray *plhs[], si4 nrhs, const mxArray *prhs[])
 }
 
 
-mxArray     *read_MED(void *file_list, si4 n_files, si8 start_time, si8 end_time, si8 start_idx, si8 end_idx, si1 *password, si1 *ind_chan, TERN_m12 samples_as_singles, ui1 persist_mode, TERN_m12 metadata, TERN_m12 records, TERN_m12 contigua)
+mxArray     *read_MED(C_RPS *crps)
 {
 	si1					*action_str;
-        si4                                     n_channels, n_active_channels, *seg_samps, n_segments;
-	ui8                                     n_dims, flags;
-        si8                                     i, j, k, m, n_seg_samps;
-	sf4					*mat_sf4_samps;
-        sf8                                     *mat_sf8_samps;
+        si4                                     n_channels, n_active_channels;
+	ui8                                     flags;
+        si8                                     i, j;
+	TIME_SLICE_m12				slice;
         SESSION_m12                             *sess;
         CHANNEL_m12                             *chan;
-        SEGMENT_m12                             *seg;
-        CMP_PROCESSING_STRUCT_m12               *cps;
-        TIME_SLICE_m12                          slice;
+	JOB_INFO				*jobs;
+	PROC_THREAD_INFO_m12			*proc_thread_infos;
         mxArray                                 *mat_sess, *mat_chans;
-        mxArray                                	*mat_data;
-	mwSize					dims[2];
         const si4                               n_mat_sess_fields = NUMBER_OF_SESSION_FIELDS_mat;
         const si1                               *mat_sess_field_names[] = SESSION_FIELD_NAMES_mat;
         const si4                               n_mat_channel_fields = NUMBER_OF_CHANNEL_FIELDS_mat;
         const si1                               *mat_channel_field_names[] = CHANNEL_FIELD_NAMES_mat;
 
 
+	// set limit pairs
+	if (crps->start_time == UUTC_NO_ENTRY_m12 && crps->end_time == UUTC_NO_ENTRY_m12) {
+		if (crps->start_index == SAMPLE_NUMBER_NO_ENTRY_m12 && crps->end_index == SAMPLE_NUMBER_NO_ENTRY_m12) {  // nothing passed, default to time
+			crps->start_time = BEGINNING_OF_TIME_m12;
+			crps->end_time = END_OF_TIME_m12;
+		} else {
+			if (crps->start_index == SAMPLE_NUMBER_NO_ENTRY_m12)
+				crps->start_index = BEGINNING_OF_SAMPLE_NUMBERS_m12;
+			else
+				crps->end_index = END_OF_SAMPLE_NUMBERS_m12;
+		}
+	} else {  // at least one time passed
+		if (crps->start_time == UUTC_NO_ENTRY_m12)
+			crps->start_time = BEGINNING_OF_TIME_m12;
+		if (crps->end_time == UUTC_NO_ENTRY_m12)
+			crps->end_time = END_OF_TIME_m12;
+		crps->start_index = crps->end_index = SAMPLE_NUMBER_NO_ENTRY_m12;  // time supersedes indices
+	}
+			
 	// copy global
 	sess = med_sess;
 	
         // read session
         G_initialize_time_slice_m12(&slice);
-	slice.start_time = start_time;
-	slice.end_time = end_time;
-	slice.start_sample_number = start_idx;
-	slice.end_sample_number = end_idx;
-	if (*ind_chan)
-		strcpy(globals_m12->reference_channel_name, ind_chan);
+	slice.start_time = crps->start_time;
+	slice.end_time = crps->end_time;
+	slice.start_sample_number = crps->start_index;
+	slice.end_sample_number = crps->end_index;
+	if (*crps->index_channel)
+		strcpy(globals_m12->reference_channel_name, crps->index_channel);
 	flags = (LH_READ_SLICE_SEGMENT_DATA_m12 | LH_READ_SLICE_SESSION_RECORDS_m12 | LH_READ_SLICE_SEGMENTED_SESS_RECS_m12);
-	if (persist_mode & PERSIST_CLOSE) {
+	if (crps->persist_mode & PERSIST_CLOSE) {
 		if (med_sess == NULL)
 			flags |= LH_NO_CPS_CACHING_m12;  // not efficient for single reads
 	} else {
 		flags |= LH_MAP_ALL_SEGMENTS_m12;  // more efficient for sequential reads
 	}
 	    
-	if (persist_mode == PERSIST_OPEN) {
-		sess = G_open_session_m12(NULL, &slice, file_list, n_files, flags, password);
+	if (crps->persist_mode == PERSIST_OPEN) {
+		sess = G_open_session_m12(NULL, &slice, crps->MED_paths, crps->n_files, flags, crps->password);
 		if (sess != NULL) {
 			med_sess = sess;  // save session
 			return(mxCreateLogicalScalar((mxLogical) 1));
 		}
 		action_str = "open";
 	} else {
-		sess = G_read_session_m12(sess, &slice, file_list, n_files, flags, password);
+		sess = G_read_session_m12(sess, &slice, crps->MED_paths, crps->n_files, flags, crps->password);
 		action_str = "read";
 	}
 	if (sess == NULL) {
 		if (globals_m12->password_data.processed == 0) {
-			G_warning_message_m12("\n%s():\nCannot %s session => no matching input files.\n", __FUNCTION__, action_str);
+			G_warning_message_m12("%s(): Cannot %s session => no matching input files\n", __FUNCTION__, action_str);
 		} else {
-			if (*globals_m12->password_data.level_1_password_hint || *globals_m12->password_data.level_2_password_hint) {
-				G_warning_message_m12("\n%s():\nCannot %s session => Check that the password is correct.\n", __FUNCTION__, action_str);
-				G_show_password_hints_m12(NULL);
-			} else {
-				G_warning_message_m12("\n%s():\nCannot %s session => Check that the password is correct, and that metadata files exist.\n", __FUNCTION__, action_str);
-			}
+			if (*globals_m12->password_data.level_1_password_hint || *globals_m12->password_data.level_2_password_hint)
+				G_warning_message_m12("%s(): Cannot %s session => check that the password is correct\n", __FUNCTION__, action_str);
+			else
+				G_warning_message_m12("%s():Cannot %s session => check that the password is correct, and that crps.metadata files exist\n", __FUNCTION__, action_str);
 		}
-		putchar_m12('\n');
 		if (med_sess != NULL) {  // free session if exists
 			G_free_session_m12(med_sess, TRUE_m12);
 			med_sess = NULL;
@@ -484,53 +517,49 @@ mxArray     *read_MED(void *file_list, si4 n_files, si8 start_time, si8 end_time
         mat_chans = mxCreateStructMatrix(n_active_channels, 1, n_mat_channel_fields, mat_channel_field_names);
         mxSetFieldByNumber(mat_sess, 0, SESSION_FIELDS_CHANNELS_IDX_mat, mat_chans);
 
-	// build channel names (duplicated in metadata, but convenient for viewing
+	// build channel names (duplicated in crps.metadata, but convenient for viewing
 	build_channel_names(sess, mat_sess);
 	
-	// Build metadata
-	if (metadata == TRUE_m12)
+	// Build crps.metadata
+	if (crps->metadata == TRUE_m12)
 		build_metadata(sess, mat_sess);
 
 	// Build contigua
-	if (contigua == TRUE_m12)
+	if (crps->contigua == TRUE_m12)
 		build_contigua(sess, mat_sess);
 	
 	// Build session records
-	if (records == TRUE_m12)
+	if (crps->records == TRUE_m12)
         	build_session_records(sess, mat_sess);
 	
-	// Fill in channel data
-	n_segments = sess->time_slice.number_of_segments;
-	n_dims = 2; dims[1] = 1;
-        for (i = j = 0; i < n_channels; ++i) {
+	// set up distribution & filtering jobs
+	jobs = (JOB_INFO *) malloc((size_t) n_active_channels * sizeof(JOB_INFO));
+	proc_thread_infos = (PROC_THREAD_INFO_m12 *) calloc((size_t) n_active_channels, sizeof(PROC_THREAD_INFO_m12));
+	for (i = j = 0; i < n_channels; ++i) {
 		chan = sess->time_series_channels[i];
 		if ((chan->flags & LH_CHANNEL_ACTIVE_m12) == 0)
 			continue;
-		dims[0] = TIME_SLICE_SAMPLE_COUNT_S_m12(chan->time_slice);
-                if (samples_as_singles == TRUE_m12) {
-                        mat_data = mxCreateNumericArray(n_dims, dims, mxSINGLE_CLASS, mxREAL);
-                        mat_sf4_samps = (sf4 *) mxGetPr(mat_data);
-                } else {
-                        mat_data = mxCreateNumericArray(n_dims, dims, mxDOUBLE_CLASS, mxREAL);
-                        mat_sf8_samps = (sf8 *) mxGetPr(mat_data);
-                }
-		for (k = 0; k < n_segments; ++k) {
-                        seg = chan->segments[k];
-                        cps = seg->time_series_data_fps->parameters.cps;
-                        seg_samps = cps->decompressed_data;
-			n_seg_samps = TIME_SLICE_SAMPLE_COUNT_S_m12(seg->time_slice);
-                        if (samples_as_singles == TRUE_m12) {
-				for (m = n_seg_samps; m--;)
-					*mat_sf4_samps++ = (sf4) *seg_samps++;
-                        } else {
-				for (m = n_seg_samps; m--;) {
-					*mat_sf8_samps++ = (sf8) *seg_samps++;
-				}
-                        }
-                }
-                mxSetFieldByNumber(mat_chans, j, CHANNEL_FIELDS_DATA_IDX_mat, mat_data);
+		jobs[j].channel = chan;
+		jobs[j].crps = crps;
+		jobs[j].samples = NULL;
+		proc_thread_infos[j].thread_f = distribute_and_filter;
+		proc_thread_infos[j].thread_label = "distribute_and_filter";
+		proc_thread_infos[j].priority = PROC_HIGH_PRIORITY_m12;
+		proc_thread_infos[j].arg = (void *) (jobs + j);
 		++j;
-        }
+	}
+
+	// thread out distrution & filtering
+	PROC_distribute_jobs_m12(proc_thread_infos, n_active_channels, 0, TRUE_m12);  // no reserved cores, wait for completion
+
+	// assign data
+	for (i = j = 0; i < n_channels; ++i) {
+		chan = sess->time_series_channels[i];
+		if ((chan->flags & LH_CHANNEL_ACTIVE_m12) == 0)
+			continue;
+		mxSetFieldByNumber(mat_chans, j, CHANNEL_FIELDS_DATA_IDX_mat, jobs[j].samples);
+		++j;
+	}
 	
 	// set global
 	med_sess = sess;
@@ -669,7 +698,7 @@ void    build_metadata(SESSION_m12 *sess, mxArray *mat_sess)
 {
 	TERN_m12				relative_days;
         si1                                     time_str[TIME_STRING_BYTES_m12];
-        si4                                     i, j, seg_idx, n_chans;
+        si4                                     i, j, seg_idx, n_chans, n_sess_segs;
 	mwSize					n_dims, dims[2];
 	CHANNEL_m12				*chan;
 	TIME_SLICE_m12				*slice;
@@ -687,7 +716,7 @@ void    build_metadata(SESSION_m12 *sess, mxArray *mat_sess)
 	metadata_fps = globals_m12->reference_channel->segments[seg_idx]->metadata_fps;  // reference channel first segment (more efficient)
         uh = metadata_fps->universal_header;
 	if (uh->type_code != TIME_SERIES_METADATA_FILE_TYPE_CODE_m12)
-		printf_m12("%s(): reference channel is not a time series channel\n", __FUNCTION__);  // trigger to update code
+		G_warning_message_m12("%s(): reference channel is not a time series channel => update code\n", __FUNCTION__);  // trigger to update code
         tmd2 = &metadata_fps->metadata->time_series_section_2;
         md3 = &metadata_fps->metadata->section_3;
         dims[0] = dims[1] = 1; n_dims = 2;
@@ -743,23 +772,31 @@ void    build_metadata(SESSION_m12 *sess, mxArray *mat_sess)
         tmp_mxa = mxCreateString(time_str);
         mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_SESSION_END_TIME_STRING_IDX_mat, tmp_mxa);
 
-        // absolute start sample number
+	// slice start sample number
         tmp_mxa = mxCreateNumericArray(n_dims, dims, mxINT64_CLASS, mxREAL);
         if (slice->start_sample_number == SAMPLE_NUMBER_NO_ENTRY_m12)
                 *((si8 *) mxGetPr(tmp_mxa)) = -1;
         else
                 *((si8 *) mxGetPr(tmp_mxa)) = slice->start_sample_number + 1;  // convert to one-based indexing
-        mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_START_SAMPLE_NUMBER_IDX_mat, tmp_mxa);
+        mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_SLICE_START_SAMPLE_NUMBER_IDX_mat, tmp_mxa);
 
-        // absolute end sample number
+       // slice end sample number
         tmp_mxa = mxCreateNumericArray(n_dims, dims, mxINT64_CLASS, mxREAL);
-        if (slice->start_sample_number == SAMPLE_NUMBER_NO_ENTRY_m12)
+        if (globals_m12->time_series_frequencies_vary == TRUE_m12)
                 *((si8 *) mxGetPr(tmp_mxa)) = -1;
         else
-                *((si8 *) mxGetPr(tmp_mxa)) = slice->end_sample_number + 1;  // convert to one-based indexing
-        mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_END_SAMPLE_NUMBER_IDX_mat, tmp_mxa);
+                *((si8 *) mxGetPr(tmp_mxa)) = globals_m12->number_of_session_samples;
+        mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_SESSION_NUMBER_OF_SAMPLES_IDX_mat, tmp_mxa);
 
-        // session name
+	// session number of samples
+	tmp_mxa = mxCreateNumericArray(n_dims, dims, mxINT64_CLASS, mxREAL);
+	if (slice->start_sample_number == SAMPLE_NUMBER_NO_ENTRY_m12)
+		*((si8 *) mxGetPr(tmp_mxa)) = -1;
+	else
+		*((si8 *) mxGetPr(tmp_mxa)) = slice->end_sample_number + 1;  // convert to one-based indexing
+	mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_SLICE_END_SAMPLE_NUMBER_IDX_mat, tmp_mxa);
+
+       // session name
         tmp_mxa = mxCreateString(globals_m12->fs_session_name);  // use file system name in case subset
         mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_SESSION_NAME_IDX_mat, tmp_mxa);
         
@@ -958,6 +995,7 @@ void    build_metadata(SESSION_m12 *sess, mxArray *mat_sess)
 	n_chans = sess->number_of_time_series_channels;
 	mat_chans = mxGetFieldByNumber(mat_sess, 0, SESSION_FIELDS_CHANNELS_IDX_mat);
 	n_chans = sess->number_of_time_series_channels;
+	n_sess_segs = globals_m12->number_of_session_segments;
 	for (i = j = 0; i < n_chans; ++i) {
 		chan = sess->time_series_channels[i];
 		if ((chan->flags & LH_CHANNEL_ACTIVE_m12) == 0)
@@ -968,12 +1006,17 @@ void    build_metadata(SESSION_m12 *sess, mxArray *mat_sess)
 		uh = metadata_fps->universal_header;
 		mat_chan_metadata = mxDuplicateArray(mat_sess_metadata);
 		if (globals_m12->time_series_frequencies_vary == TRUE_m12) {
-			// absolute start sample number
-			tmp_mxa = mxGetFieldByNumber(mat_chan_metadata, 0, METADATA_FIELDS_START_SAMPLE_NUMBER_IDX_mat);
+			// slice start sample number
+			tmp_mxa = mxGetFieldByNumber(mat_chan_metadata, 0, METADATA_FIELDS_SLICE_START_SAMPLE_NUMBER_IDX_mat);
 			*((si8 *) mxGetPr(tmp_mxa)) = slice->start_sample_number + 1;  // convert to one-based indexing
-			// absolute end sample number
-			tmp_mxa = mxGetFieldByNumber(mat_chan_metadata, 0, METADATA_FIELDS_END_SAMPLE_NUMBER_IDX_mat);
+			// slice end sample number
+			tmp_mxa = mxGetFieldByNumber(mat_chan_metadata, 0, METADATA_FIELDS_SLICE_END_SAMPLE_NUMBER_IDX_mat);
 			*((si8 *) mxGetPr(tmp_mxa)) = slice->end_sample_number + 1;  // convert to one-based indexing
+			// session number of samples
+			tmp_mxa = mxGetFieldByNumber(mat_chan_metadata, 0, METADATA_FIELDS_SESSION_NUMBER_OF_SAMPLES_IDX_mat);
+			if (chan->Sgmt_records == NULL)
+				chan->Sgmt_records = G_build_Sgmt_records_array_m12(NULL, NULL, chan);
+			*((si8 *) mxGetPr(tmp_mxa)) = chan->Sgmt_records[n_sess_segs - 1].end_sample_number + 1;  // convert to one-based indexing
 			// sampling frequency
 			tmp_mxa = mxGetFieldByNumber(mat_chan_metadata, 0, METADATA_FIELDS_SAMPLING_FREQUENCY_IDX_mat);
 			*((sf8 *) mxGetPr(tmp_mxa)) = tmd2->sampling_frequency;
@@ -1122,6 +1165,8 @@ mxArray	*fill_record(RECORD_HEADER_m12 *rh)
 	const si1               *mat_Note_v10_record_field_names[] = NOTE_v10_RECORD_FIELD_NAMES_mat;
 	const si4               n_mat_Note_v11_record_fields = NUMBER_OF_NOTE_v11_RECORD_FIELDS_mat;
 	const si1               *mat_Note_v11_record_field_names[] = NOTE_v11_RECORD_FIELD_NAMES_mat;
+	const si4               n_mat_Seiz_v10_record_fields = NUMBER_OF_SEIZ_v10_RECORD_FIELDS_mat;
+	const si1               *mat_Seiz_v10_record_field_names[] = SEIZ_v10_RECORD_FIELD_NAMES_mat;
 	const si4               n_mat_Epoc_v20_record_fields = NUMBER_OF_EPOC_v20_RECORD_FIELDS_mat;
 	const si1               *mat_Epoc_v20_record_field_names[] = EPOC_v20_RECORD_FIELD_NAMES_mat;
 	const si4               n_mat_Sgmt_v10_record_fields = NUMBER_OF_SGMT_v10_RECORD_FIELDS_mat;
@@ -1131,6 +1176,7 @@ mxArray	*fill_record(RECORD_HEADER_m12 *rh)
 	const si4               n_mat_Unkn_record_fields = NUMBER_OF_UNKN_RECORD_FIELDS_mat;
 	const si1               *mat_Unkn_record_field_names[] = UNKN_RECORD_FIELD_NAMES_mat;
 	REC_Note_v11_m12        *Note_v11;
+	REC_Seiz_v10_m12        *Seiz_v10;
 	REC_NlxP_v10_m12        *NlxP_v10;
 	REC_Epoc_v20_m12        *Epoc_v20;
 	REC_Sgmt_v10_m12        *Sgmt_v10;
@@ -1154,6 +1200,13 @@ mxArray	*fill_record(RECORD_HEADER_m12 *rh)
 			}
 			if (rh->version_major == 1 && rh->version_minor == 1) {
 				mat_record = mxCreateStructMatrix(1, 1, n_mat_Note_v11_record_fields, mat_Note_v11_record_field_names);
+				break;
+			}
+			rh->type_code = 0;
+			break;
+		case REC_Seiz_TYPE_CODE_m12:
+			if (rh->version_major == 1 && rh->version_minor == 0) {
+				mat_record = mxCreateStructMatrix(1, 1, n_mat_Seiz_v10_record_fields, mat_Seiz_v10_record_field_names);
 				break;
 			}
 			rh->type_code = 0;
@@ -1281,6 +1334,29 @@ mxArray	*fill_record(RECORD_HEADER_m12 *rh)
 					else
 						tmp_mxa = mxCreateString("<empty note>");
 					mxSetFieldByNumber(mat_record, 0, NOTE_v11_RECORD_FIELDS_TEXT_IDX_mat, tmp_mxa);
+				}
+				break;
+			case REC_Seiz_TYPE_CODE_m12:
+				if (rh->version_major == 1 && rh->version_minor == 0) {
+					Seiz_v10 = (REC_Seiz_v10_m12 *) ((ui1 *) rh + RECORD_HEADER_BYTES_m12);
+					// end time
+					tmp_mxa = mxCreateNumericArray(n_dims, dims, mxINT64_CLASS, mxREAL);
+					*((si8 *) mxGetPr(tmp_mxa)) = Seiz_v10->end_time;
+					mxSetFieldByNumber(mat_record, 0, SEIZ_v10_RECORD_FIELDS_END_TIME_IDX_mat, tmp_mxa);
+					// end time string
+					if (Seiz_v10->end_time > 0)
+						STR_time_string_m12(Seiz_v10->end_time, time_str, TRUE_m12, relative_days, FALSE_m12);
+					else
+						tmp_mxa = mxCreateString("<no entry>");
+					tmp_mxa = mxCreateString(time_str);
+					mxSetFieldByNumber(mat_record, 0, SEIZ_v10_RECORD_FIELDS_END_TIME_STRING_IDX_mat, tmp_mxa);
+					// description
+					text = Seiz_v10->description;
+					if (*text)
+						tmp_mxa = mxCreateString(text);
+					else
+						tmp_mxa = mxCreateString("<no description>");
+					mxSetFieldByNumber(mat_record, 0, SEIZ_v10_RECORD_FIELDS_DESCRIPTION_IDX_mat, tmp_mxa);
 				}
 				break;
 			case REC_Epoc_TYPE_CODE_m12:
@@ -1468,6 +1544,16 @@ mxArray	*fill_record(RECORD_HEADER_m12 *rh)
 					mxSetFieldByNumber(mat_record, 0, NOTE_v11_RECORD_FIELDS_TEXT_IDX_mat, tmp_mxa);
 				}
 				break;
+			case REC_Seiz_TYPE_CODE_m12:
+				if (rh->version_major == 1 && rh->version_minor == 1) {
+					// end time
+					mxSetFieldByNumber(mat_record, 0, SEIZ_v10_RECORD_FIELDS_END_TIME_IDX_mat, tmp_mxa);
+					// end time string
+					mxSetFieldByNumber(mat_record, 0, SEIZ_v10_RECORD_FIELDS_END_TIME_STRING_IDX_mat, tmp_mxa);
+					// text
+					mxSetFieldByNumber(mat_record, 0, SEIZ_v10_RECORD_FIELDS_DESCRIPTION_IDX_mat, tmp_mxa);
+				}
+				break;
 			case REC_Epoc_TYPE_CODE_m12:
 				// end time
 				mxSetFieldByNumber(mat_record, 0, EPOC_v20_RECORD_FIELDS_END_TIME_IDX_mat, tmp_mxa);
@@ -1526,11 +1612,41 @@ mxArray	*fill_record(RECORD_HEADER_m12 *rh)
 }
 
 
+TERN_m12	get_logical(const mxArray *mx_arr)
+{
+	TERN_m12	val;
+	si1		temp_str[16];
+	
+	
+	val = UNKNOWN_m12;
+	if (mxGetClassID(mx_arr) == mxCHAR_CLASS) {
+		mxGetString(mx_arr, temp_str, 16);
+		if (*temp_str == 't' || *temp_str == 'T' || *temp_str == 'y' || *temp_str == 'Y' || *temp_str == '1')
+			val = TRUE_m12;
+		else if (*temp_str == 'f' || *temp_str == 'F' || *temp_str == 'n' || *temp_str == 'N' || *temp_str == '0')
+			val = FALSE_m12;
+	} else if (mxIsLogicalScalar(mx_arr)) {
+		if (mxIsLogicalScalarTrue(mx_arr) == 1)
+			val = TRUE_m12;
+		else
+			val = FALSE_m12;
+	} else if (mxIsScalar(mx_arr)) {
+		if (mxGetScalar(mx_arr) == 1)
+			val = TRUE_m12;
+		else if (mxGetScalar(mx_arr) == 0)
+			val = FALSE_m12;
+	}
+	
+	return(val);
+}
+			       
+
 si8     get_si8_scalar(const mxArray *mx_arr)
 {
         sf8     tmp_sf8;
         
-        
+
+
         if (mxGetNumberOfElements(mx_arr) != 1)
 		G_error_message_m12("%s(): multiple element array\n", __FUNCTION__);
         
@@ -1538,8 +1654,7 @@ si8     get_si8_scalar(const mxArray *mx_arr)
                 case mxDOUBLE_CLASS:
                 case mxSINGLE_CLASS:
                         tmp_sf8 = (sf8) mxGetScalar(mx_arr);
-                        tmp_sf8 = round(tmp_sf8);
-                        return((si8) tmp_sf8);
+                        return((si8) round(tmp_sf8));
                 case mxCHAR_CLASS:
                 case mxINT8_CLASS:
                 case mxUINT8_CLASS:
@@ -1550,6 +1665,11 @@ si8     get_si8_scalar(const mxArray *mx_arr)
                 case mxINT64_CLASS:
                 case mxUINT64_CLASS:
                         break;
+		case mxLOGICAL_CLASS:
+			if (mxIsLogicalScalarTrue(mx_arr) == 1)
+				return((si8) 1);
+			else
+				return((si8) 0);
                 default:
                         return((si8) UUTC_NO_ENTRY_m12);
         }
@@ -1576,4 +1696,192 @@ si4     rec_compare(const void *a, const void *b)
 		return(1);
 
 	return(-1);
+}
+
+
+pthread_rval_m12	distribute_and_filter(void *ptr)
+{
+	si2				*mat_si2_samps;
+	si4				*mat_si4_samps, seg_idx, n_segs, *seg_samps, filt_type, val, pos_inf, neg_inf;
+	sf4				*mat_sf4_samps;
+	si8				i, j, k, data_len;
+	sf8				*mat_sf8_samps, samp_freq, cut_1, cut_2;
+	PROC_THREAD_INFO_m12		*pi;
+	JOB_INFO 			*job;
+	TIME_SLICE_m12			*slice;
+	CHANNEL_m12			*chan;
+	SEGMENT_m12			*seg;
+	CMP_PROCESSING_STRUCT_m12	*cps;
+	FILT_PROCESSING_STRUCT_m12	*filtps;
+	C_RPS				*crps;
+	mwSize				n_dims, dims[2], pad_samps, el_size, element_multiplier;
+	mxArray				*samps;
+	mxClassID			mat_class;
+
+	
+	pi = (PROC_THREAD_INFO_m12 *) ptr;
+	pi->status = PROC_THREAD_RUNNING_m12;  // volatile
+	
+	job = (JOB_INFO *) (pi->arg);
+	chan = job->channel;
+	slice = &chan->time_slice;
+	data_len = TIME_SLICE_SAMPLE_COUNT_m12(slice);
+	n_segs = TIME_SLICE_SEGMENT_COUNT_m12(slice);
+	seg_idx = G_get_segment_index_m12(slice->start_segment_number);
+	crps = job->crps;
+
+	// set up for format / filtering
+	if (crps->filter > FILT_NONE) {
+		switch (crps->filter) {
+			case FILT_LOWPASS:
+				filt_type = FILT_LOWPASS_TYPE_m12;
+				cut_1 = crps->high_cutoff;
+				cut_2 = (sf8) -1.0;  // assauge compiler
+				break;
+			case FILT_HIGHPASS:
+				filt_type = FILT_HIGHPASS_TYPE_m12;
+				cut_1 = crps->low_cutoff;
+				cut_2 = (sf8) -1.0;  // assauge compiler
+				break;
+			case FILT_BANDPASS:
+				filt_type = FILT_BANDPASS_TYPE_m12;
+				cut_1 = crps->low_cutoff;
+				cut_2 = crps->high_cutoff;
+			case FILT_BANDSTOP:
+				filt_type = FILT_BANDSTOP_TYPE_m12;
+				cut_1 = crps->low_cutoff;
+				cut_2 = crps->high_cutoff;
+				break;
+		}
+		samp_freq = chan->segments[seg_idx]->metadata_fps->metadata->time_series_section_2.sampling_frequency;
+		filtps = FILT_initialize_processing_struct_m12(FILTER_ORDER, filt_type, samp_freq, data_len, FALSE_m12, FALSE_m12, TRUE_m12, RETURN_ON_FAIL_m12 | SUPPRESS_OUTPUT_m12, cut_1, cut_2);
+		pad_samps = (mwSize) FILT_FILT_PAD_SAMPLES_m12(filtps->n_poles);
+	} else {
+		pad_samps = 0;
+	}
+
+	switch (crps->format) {
+		case FORMAT_DOUBLE:
+			el_size = (mwSize) 8;
+			mat_class = mxDOUBLE_CLASS;
+			break;
+		case FORMAT_SINGLE:
+			el_size = (mwSize) 4;
+			mat_class = mxSINGLE_CLASS;
+			break;
+		case FORMAT_INT32:
+			el_size = (mwSize) 4;
+			mat_class = mxINT32_CLASS;
+			break;
+		case FORMAT_INT16:
+			el_size = (mwSize) 2;
+			mat_class = mxINT16_CLASS;
+			break;
+	}
+	if (crps->filter > FILT_NONE)
+		element_multiplier = (mwSize) 8 / el_size;  // need sf8s to filter
+	else
+		element_multiplier = (mwSize) 1;
+
+	// allocate Matlab array
+	n_dims = 2; dims[1] = 1;
+	dims[0] = ((mwSize) data_len * element_multiplier) + pad_samps;
+	samps = mxCreateNumericArray(n_dims, dims, mat_class, mxREAL);
+
+	// Fill in channel data
+	mat_sf8_samps = (sf8 *) mxGetPr(samps);
+	switch (crps->format) {
+		case FORMAT_SINGLE:
+			mat_sf4_samps = (sf4 *) mat_sf8_samps;
+			break;
+		case FORMAT_INT32:
+			mat_si4_samps = (si4 *) mat_sf8_samps;
+			break;
+		case FORMAT_INT16:
+			mat_si2_samps = (si2 *) mat_sf8_samps;
+			break;
+	}
+
+	
+	// no filtering
+	if (crps->filter == FILT_NONE) {
+		for (i = 0, j = seg_idx; i < n_segs; ++i, ++j) {
+			seg = chan->segments[j];
+			cps = seg->time_series_data_fps->parameters.cps;
+			seg_samps = cps->decompressed_data;
+			k = TIME_SLICE_SAMPLE_COUNT_S_m12(seg->time_slice);
+			switch (crps->format) {
+				case FORMAT_DOUBLE:
+					while (k--)
+						*mat_sf8_samps++ = (sf8) *seg_samps++;
+					break;
+				case FORMAT_SINGLE:
+					while (k--)
+						*mat_sf4_samps++ = (sf4) *seg_samps++;
+					break;
+				case FORMAT_INT32:
+					while (k--)
+						*mat_si4_samps++ = (si4) *seg_samps++;
+					break;
+				case FORMAT_INT16:
+					pos_inf = (si4) POS_INF_SI2_m12;
+					neg_inf = (si4) NEG_INF_SI2_m12;
+					while (k--) {
+						val = *seg_samps++;  // curtail overflow
+						if (val > pos_inf)
+							val = POS_INF_SI2_m12;
+						else if (val < neg_inf)
+							val = NEG_INF_SI2_m12;
+						*mat_si2_samps++ = (si2) val;
+					}
+					break;
+			}
+		}
+	} else {  // filter
+		
+		// fill original data as sf8s
+		filtps->filt_data = mat_sf8_samps;
+		filtps->orig_data = FILT_OFFSET_ORIG_DATA_m12(filtps);  // offset to skip intial copy, filter in place
+		mat_sf8_samps = filtps->orig_data;  // offset position
+		for (i = 0, j = seg_idx; i < n_segs; ++i, ++j) {
+			seg = chan->segments[j];
+			cps = seg->time_series_data_fps->parameters.cps;
+			seg_samps = cps->decompressed_data;
+			k = TIME_SLICE_SAMPLE_COUNT_S_m12(seg->time_slice);
+			while (k--)
+				*mat_sf8_samps++ = (sf8) *seg_samps++;
+		}
+		
+		// filter
+		FILT_filtfilt_m12(filtps);
+		
+		// convert to output size (& round)
+		mat_sf8_samps = filtps->filt_data;  // base position
+		switch (crps->format) {
+			case FORMAT_DOUBLE:
+				break;
+			case FORMAT_SINGLE:
+				CMP_sf8_to_sf4_m12(mat_sf8_samps, mat_sf4_samps, data_len, TRUE_m12);
+				break;
+			case FORMAT_INT32:
+				CMP_sf8_to_si4_m12(mat_sf8_samps, mat_si4_samps, data_len, TRUE_m12);
+				break;
+			case FORMAT_INT16:
+				CMP_sf8_to_si2_m12(mat_sf8_samps, mat_si2_samps, data_len, TRUE_m12);
+				break;
+		}
+
+		// clean up
+		FILT_free_processing_struct_m12(filtps, FALSE_m12, FALSE_m12, TRUE_m12, FALSE_m12);
+
+		// resize
+		mxSetM(samps, (mwSize) data_len);
+		mxRealloc((void *) mat_sf8_samps, (mwSize) data_len * el_size);
+	}
+	
+	job->samples = samps;
+	
+	pi->status = PROC_THREAD_FINISHED_m12;  // volatile
+
+	return((pthread_rval_m12) 0);
 }

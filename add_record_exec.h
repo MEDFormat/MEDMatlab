@@ -16,7 +16,7 @@
 // Prototypes
 void	mexFunction(si4 nlhs, mxArray *plhs[], si4 nrhs, const mxArray *prhs[]);
 si8	get_si8_scalar(const mxArray *mx_arr);
-sf8	add_record(si1 *chan_dir, si1 *password, si8 rec_time, si1 *note_text, si1 enc_level);
+sf8	add_record(si1 *chan_dir, si1 *password, si1 *rec_type, si8 rec_time, si1 *rec_text, si1 enc_level);
 
 
 #endif /* ADD_RECORD_EXEC_IN */

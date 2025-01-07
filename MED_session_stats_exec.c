@@ -229,12 +229,13 @@ mxArray     *MED_session_stats(void *file_list, si4 n_files, TERN_m12 return_cha
 	sess = G_open_session_m12(NULL, &slice, file_list, n_files, flags, password);  // threaded version
 	if (sess == NULL) {
 		if (globals_m12->password_data.processed == 0) {
-			G_warning_message_m12("\nMED_session_stats():\nCannot read session => session not found\n");
+			G_warning_message_m12("%s(): cannot open session => no matching input files\n", __FUNCTION__);
 		} else {
-			G_warning_message_m12("\nMED_session_stats():\nCannot read session => Check that the password is correct, and that metadata files exist.\n");
-			G_show_password_hints_m12(NULL);
+			if (*globals_m12->password_data.level_1_password_hint || *globals_m12->password_data.level_2_password_hint)
+				G_warning_message_m12("%s(): cannot open session => check that the password is correct\n", __FUNCTION__);
+			else
+				G_warning_message_m12("%s(): cannot open session => check that the password is correct, and that metadata files exist\n", __FUNCTION__);
 		}
-		putchar_m12('\n');
 		return(NULL);
 	}
 	
@@ -460,21 +461,13 @@ void    build_metadata(SESSION_m12 *sess, mxArray *mat_session, TERN_m12 return_
 	tmp_mxa = mxCreateString(time_str);
 	mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_SESSION_END_TIME_STRING_IDX_mat, tmp_mxa);
 
-	// absolute start sample number
-	tmp_mxa = mxCreateNumericArray(n_dims, dims, mxINT64_CLASS, mxREAL);
-	if (globals_m12->time_series_frequencies_vary == TRUE_m12)
-		*((si8 *) mxGetPr(tmp_mxa)) = -1;
-	else
-		*((si8 *) mxGetPr(tmp_mxa)) = 1;  // one-based indexing
-	mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_START_SAMPLE_NUMBER_IDX_mat, tmp_mxa);
-
-	// absolute end sample number
+	// session number of samples
 	tmp_mxa = mxCreateNumericArray(n_dims, dims, mxINT64_CLASS, mxREAL);
 	if (globals_m12->time_series_frequencies_vary == TRUE_m12)
 		*((si8 *) mxGetPr(tmp_mxa)) = -1;
 	else
 		*((si8 *) mxGetPr(tmp_mxa)) = slice->end_sample_number + 1;  // convert to one-based indexing
-	mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_END_SAMPLE_NUMBER_IDX_mat, tmp_mxa);
+	mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_SESSION_NUMBER_OF_SAMPLES_IDX_mat, tmp_mxa);
 
 	// session name
 	tmp_mxa = mxCreateString(globals_m12->fs_session_name);  // use file system name in case subset
@@ -682,12 +675,9 @@ void    build_metadata(SESSION_m12 *sess, mxArray *mat_session, TERN_m12 return_
 		uh = metadata_fps->universal_header;
 		mat_chan_metadata = mxDuplicateArray(mat_sess_metadata);
 		if (globals_m12->time_series_frequencies_vary == TRUE_m12) {
-			// absolute start sample number
-			tmp_mxa = mxGetFieldByNumber(mat_chan_metadata, 0, METADATA_FIELDS_START_SAMPLE_NUMBER_IDX_mat);
-			*((si8 *) mxGetPr(tmp_mxa)) = 1;  // one-based indexing
-			// absolute end sample number
-			tmp_mxa = mxGetFieldByNumber(mat_chan_metadata, 0, METADATA_FIELDS_END_SAMPLE_NUMBER_IDX_mat);
-			*((si8 *) mxGetPr(tmp_mxa)) = tmd2->absolute_start_sample_number + tmd2->number_of_samples;  // one-based indexing
+			// session number of samples
+			tmp_mxa = mxGetFieldByNumber(mat_chan_metadata, 0, METADATA_FIELDS_SESSION_NUMBER_OF_SAMPLES_IDX_mat);
+			*((si8 *) mxGetPr(tmp_mxa)) = slice->end_sample_number + 1;  // convert to one-based indexing
 			// sampling frequency
 			tmp_mxa = mxGetFieldByNumber(mat_chan_metadata, 0, METADATA_FIELDS_SAMPLING_FREQUENCY_IDX_mat);
 			*((sf8 *) mxGetPr(tmp_mxa)) = tmd2->sampling_frequency;
@@ -1258,8 +1248,7 @@ si8     get_si8_scalar(const mxArray *mx_arr)
                 case mxDOUBLE_CLASS:
                 case mxSINGLE_CLASS:
                         tmp_sf8 = (sf8) mxGetScalar(mx_arr);
-                        tmp_sf8 = round(tmp_sf8);
-                        return((si8) tmp_sf8);
+                        return((si8) round(tmp_sf8));
                 case mxCHAR_CLASS:
                 case mxINT8_CLASS:
                 case mxUINT8_CLASS:
@@ -1270,6 +1259,11 @@ si8     get_si8_scalar(const mxArray *mx_arr)
                 case mxINT64_CLASS:
                 case mxUINT64_CLASS:
                         break;
+		case mxLOGICAL_CLASS:
+			if (mxIsLogicalScalarTrue(mx_arr) == 1)
+				return((si8) 1);
+			else
+				return((si8) 0);
                 default:
                         return((si8) UUTC_NO_ENTRY_m12);
         }

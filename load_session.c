@@ -8,8 +8,8 @@
 //*******************************************************************************************************//
 
 
-// [session, record_times, discontigua] = read_MED(file_list, [password])
-// file_list: string array, strings can contain regexp
+// [session, record_times, discontigua] = read_MED(MED_dirs, [password])
+// MED_dirs: string array, strings can contain regexp
 // password: if empty/absent, proceeds as if unencrypted (may error out)
 // session: Matlab session structure with metadata & no data
 // record times: times as proportion of session duration
@@ -22,8 +22,8 @@
 // Mex gateway routine
 void    mexFunction(si4 nlhs, mxArray *plhs[], si4 nrhs, const mxArray *prhs[])
 {
-        void                    *file_list;
-        si1                     password[PASSWORD_BYTES_m12], **file_list_p;
+        void                    *MED_dirs;
+        si1                     password[PASSWORD_BYTES_m12], **MED_dirs_p;
 	si4                     i, len, max_len, n_files;
         mxArray                 *mx_cell_p, *outputs[3];
 
@@ -37,7 +37,7 @@ void    mexFunction(si4 nlhs, mxArray *plhs[], si4 nrhs, const mxArray *prhs[])
 	for (i = 0; i < 3; ++i)
 		plhs[i] = mxCreateDoubleMatrix(0, 0, mxREAL);
 	if (nrhs == 0 || nrhs > 2)
-		mexErrMsgTxt("One to 2 inputs required: file_list, [password]\n");
+		mexErrMsgTxt("One to 2 inputs required: MED_dirs, [password]\n");
 	
         // get the input file name(s) (argument 1)
 	n_files = max_len = 0;
@@ -54,7 +54,7 @@ void    mexFunction(si4 nlhs, mxArray *plhs[], si4 nrhs, const mxArray *prhs[])
                 for (i = max_len = 0; i < n_files; ++i) {
                         mx_cell_p = mxGetCell(prhs[0], i);
 			if (mxGetClassID(mx_cell_p) != mxCHAR_CLASS)
-				mexErrMsgTxt("Elements of file_list cell array must be char arrays\n");
+				mexErrMsgTxt("Elements of MED_dirs cell array must be char arrays\n");
                         len = mxGetNumberOfElements(mx_cell_p) + 1; // Get the length of the input string
                         if (len > FULL_FILE_NAME_BYTES_m12)
 				mexErrMsgTxt("Input File Name (input 1) is too long\n");
@@ -85,24 +85,24 @@ void    mexFunction(si4 nlhs, mxArray *plhs[], si4 nrhs, const mxArray *prhs[])
 	G_initialize_medlib_m12(FALSE_m12, FALSE_m12);
 	
 	// create input file list
-	file_list = NULL;
+	MED_dirs = NULL;
 	switch (n_files) {
 		case 0:  // single string passed
-			file_list = calloc_m12((size_t) max_len, sizeof(si1), __FUNCTION__, USE_GLOBAL_BEHAVIOR_m12);
-			mxGetString(prhs[0], (si1 *) file_list, max_len);
+			MED_dirs = calloc_m12((size_t) max_len, sizeof(si1), __FUNCTION__, USE_GLOBAL_BEHAVIOR_m12);
+			mxGetString(prhs[0], (si1 *) MED_dirs, max_len);
 			break;
 		case 1:   // single string passed in cell array
-			file_list = calloc_m12((size_t) max_len, sizeof(si1), __FUNCTION__, USE_GLOBAL_BEHAVIOR_m12);
+			MED_dirs = calloc_m12((size_t) max_len, sizeof(si1), __FUNCTION__, USE_GLOBAL_BEHAVIOR_m12);
 			mx_cell_p = mxGetCell(prhs[0], 0);
-			mxGetString(mx_cell_p, (si1 *) file_list, max_len);
+			mxGetString(mx_cell_p, (si1 *) MED_dirs, max_len);
 			n_files = 0;  // (indicates single string)
 			break;
 		default:
-			file_list = (void *) calloc_2D_m12((size_t) n_files, (size_t) max_len, sizeof(si1), __FUNCTION__, USE_GLOBAL_BEHAVIOR_m12);
-			file_list_p = (si1 **) file_list;
+			MED_dirs = (void *) calloc_2D_m12((size_t) n_files, (size_t) max_len, sizeof(si1), __FUNCTION__, USE_GLOBAL_BEHAVIOR_m12);
+			MED_dirs_p = (si1 **) MED_dirs;
 			for (i = 0; i < n_files; ++i) {
 				mx_cell_p = mxGetCell(prhs[0], i);
-				mxGetString(mx_cell_p, file_list_p[i], max_len);
+				mxGetString(mx_cell_p, MED_dirs_p[i], max_len);
 			}
 			break;
 	}
@@ -110,7 +110,7 @@ void    mexFunction(si4 nlhs, mxArray *plhs[], si4 nrhs, const mxArray *prhs[])
         // get out of here
 	for (i = 0; i < 3; ++i)
 		outputs[i] = NULL;
-	load_session(file_list, n_files, password, outputs);
+	load_session(MED_dirs, n_files, password, outputs);
 	
 	// set return values
 	for (i = 0; i < 3; ++i) {
@@ -121,14 +121,14 @@ void    mexFunction(si4 nlhs, mxArray *plhs[], si4 nrhs, const mxArray *prhs[])
 	}
 
         // clean up
-        free_m12((void *) file_list, __FUNCTION__);
+        free_m12((void *) MED_dirs, __FUNCTION__);
 	G_free_globals_m12(TRUE_m12);
 
         return;
 }
 
 
-si4     load_session(void *file_list, si4 n_files, si1 *password, mxArray *plhs[])
+si4     load_session(void *MED_dirs, si4 n_files, si1 *password, mxArray *plhs[])
 {
         si4                                     n_channels;
 	ui8                                     flags;
@@ -145,22 +145,19 @@ si4     load_session(void *file_list, si4 n_files, si1 *password, mxArray *plhs[
 	sess_slice = &local_sess_slice;
         G_initialize_time_slice_m12(sess_slice);
 	flags = (LH_READ_SEGMENT_METADATA_m12 | LH_READ_SLICE_SESSION_RECORDS_m12 | LH_READ_SLICE_SEGMENTED_SESS_RECS_m12);
-//	printf_m12("%s(%d): switch back to threaded\n", __FUNCTION__, __LINE__);
-//	sess = G_open_session_nt_m12(NULL, sess_slice, file_list, n_files, flags, password);
-	sess = G_open_session_m12(NULL, sess_slice, file_list, n_files, flags, password);
+	sess = G_open_session_m12(NULL, sess_slice, MED_dirs, n_files, flags, password);
 	if (sess == NULL) {
-		G_push_behavior_m12(RETURN_ON_FAIL_m12);
 		if (globals_m12->password_data.processed == 0) {
-			G_warning_message_m12("%s():\nCannot read session => no matching, or damaged input files.\n", __FUNCTION__);
+			G_warning_message_m12("%s(): cannot open session => no matching input files\n", __FUNCTION__);
 		} else {
-			G_warning_message_m12("%s():\nCannot read session => Check that the password is correct, and that metadata files exist.\n", __FUNCTION__);
-			G_show_password_hints_m12(NULL);
+			if (*globals_m12->password_data.level_1_password_hint || *globals_m12->password_data.level_2_password_hint)
+				G_warning_message_m12("%s(): cannot open session => check that the password is correct\n", __FUNCTION__);
+			else
+				G_warning_message_m12("%s(): cannot open session => check that the password is correct, and that metadata files exist\n", __FUNCTION__);
 		}
-		putchar_m12('\n');
-		G_pop_behavior_m12();
 		return(-1);
 	}
-	
+
 	// get variable frequency (not done on open)
 	G_frequencies_vary_m12(sess);
 
@@ -318,21 +315,13 @@ void    build_metadata(SESSION_m12 *sess, mxArray *mat_session)
 	tmp_mxa = mxCreateString(time_str);
 	mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_SESSION_END_TIME_STRING_IDX_mat, tmp_mxa);
 
-	// absolute start sample number
-	tmp_mxa = mxCreateNumericArray(n_dims, dims, mxINT64_CLASS, mxREAL);
-	if (globals_m12->time_series_frequencies_vary == TRUE_m12)
-		*((si8 *) mxGetPr(tmp_mxa)) = -1;
-	else
-		*((si8 *) mxGetPr(tmp_mxa)) = 1;  // one-based indexing	
-	mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_START_SAMPLE_NUMBER_IDX_mat, tmp_mxa);
-
-	// absolute end sample number
+	// session number of samples
 	tmp_mxa = mxCreateNumericArray(n_dims, dims, mxINT64_CLASS, mxREAL);
 	if (globals_m12->time_series_frequencies_vary == TRUE_m12)
 		*((si8 *) mxGetPr(tmp_mxa)) = -1;
 	else
 		*((si8 *) mxGetPr(tmp_mxa)) = slice->end_sample_number + 1;  // convert to one-based indexing
-	mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_END_SAMPLE_NUMBER_IDX_mat, tmp_mxa);
+	mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_SESSION_NUMBER_OF_SAMPLES_IDX_mat, tmp_mxa);
 
 	// session name
 	tmp_mxa = mxCreateString(globals_m12->fs_session_name);  // use file system name in case subset
@@ -541,11 +530,8 @@ void    build_metadata(SESSION_m12 *sess, mxArray *mat_session)
 		uh = metadata_fps->universal_header;
 		mat_chan_metadata = mxDuplicateArray(mat_sess_metadata);
 		if (globals_m12->time_series_frequencies_vary == TRUE_m12) {
-			// absolute start sample number
-			tmp_mxa = mxGetFieldByNumber(mat_chan_metadata, 0, METADATA_FIELDS_START_SAMPLE_NUMBER_IDX_mat);
-			*((si8 *) mxGetPr(tmp_mxa)) = 1;  // one-based indexing
-			// absolute end sample number
-			tmp_mxa = mxGetFieldByNumber(mat_chan_metadata, 0, METADATA_FIELDS_END_SAMPLE_NUMBER_IDX_mat);
+			// session number of samples
+			tmp_mxa = mxGetFieldByNumber(mat_chan_metadata, 0, METADATA_FIELDS_SESSION_NUMBER_OF_SAMPLES_IDX_mat);
 			*((si8 *) mxGetPr(tmp_mxa)) = tmd2->absolute_start_sample_number + tmd2->number_of_samples;  // one-based indexing
 			// sampling frequency
 			tmp_mxa = mxGetFieldByNumber(mat_chan_metadata, 0, METADATA_FIELDS_SAMPLING_FREQUENCY_IDX_mat);
@@ -591,18 +577,19 @@ void    build_metadata(SESSION_m12 *sess, mxArray *mat_session)
 
 mxArray     *get_sess_rec_times(SESSION_m12 *sess)
 {
+	ui4				*n_recs, idx;
 	si4				n_segs, seg_idx;
-	si8                     	i, j, k, n_inds, tot_recs, n_recs, *rec_times, *rec_end, *si8_p1, *si8_p2;
-	si8				sess_start_time, sess_end_time;
-	sf8				*rec_props, sess_dur;
+	si8                     	i, j, k, n_inds, tot_recs;
+	sf8				**rec_props, *rec_prop, sess_dur, sess_start_time;
 	FILE_PROCESSING_STRUCT_m12	*ri_fps;
-	RECORD_INDEX_m12		*ri;
-	mxArray                 	*mat_rec_props;
+	RECORD_INDEX_m12		*ri, *comb_inds;
+	mxArray                 	*mat_rec_props, *tmp_mxa;
 	mwSize				n_dims, dims[2];
-
-
-	// count records
+	
+	
+	// count total records
 	tot_recs = 0;
+	seg_idx = 0;
 	n_segs = globals_m12->number_of_session_segments;
 	if (sess->record_indices_fps != NULL) {
 		ri_fps = sess->record_indices_fps;
@@ -616,84 +603,117 @@ mxArray     *get_sess_rec_times(SESSION_m12 *sess)
 				tot_recs += ri_fps->universal_header->number_of_entries;
 		}
 	}
-	rec_times = (si8 *) calloc((size_t) tot_recs, sizeof(si8));
-	if (rec_times == NULL)
-		return(NULL);
 	
-	// get record times
-	n_recs = 0;
+	// combine indices
+	comb_inds = (RECORD_INDEX_m12 *) calloc((size_t) tot_recs, sizeof(RECORD_INDEX_m12));
+	k = 0;
 	if (sess->record_indices_fps != NULL) {
 		ri_fps = sess->record_indices_fps;
-		ri = ri_fps->record_indices;
 		n_inds = ri_fps->universal_header->number_of_entries;
-		for (i = 0; i < n_inds; ++i) {
-			switch (ri[i].type_code) {
-				case REC_SyLg_TYPE_CODE_m12:
-				case REC_Term_TYPE_CODE_m12:
-					break;
-				default:
-					rec_times[n_recs] = ri[i].start_time;
-					++n_recs;
-					break;
-			}
-		}
+		memcpy((void *) (comb_inds + k), (void *) ri_fps->record_indices, (size_t) n_inds * sizeof(RECORD_INDEX_m12));
+		k += n_inds;
 	}
-	
 	if (sess->segmented_sess_recs != NULL) {
 		for (i = 0, j = seg_idx; i < n_segs; ++i, ++j) {
 			ri_fps = sess->segmented_sess_recs->record_indices_fps[j];
-			if (ri_fps == NULL)
-				continue;
-			ri = ri_fps->record_indices;
-			n_inds = ri_fps->universal_header->number_of_entries;
-			for (k = 0; k < n_inds; ++k) {
-				switch (ri[j].type_code) {
-					case REC_SyLg_TYPE_CODE_m12:
-					case REC_Term_TYPE_CODE_m12:
-						break;
-					default:
-						rec_times[n_recs] = ri[k].start_time;
-						++n_recs;
-						break;
-				}
+			if (ri_fps != NULL) {
+				n_inds = ri_fps->universal_header->number_of_entries;
+				memcpy((void *) (comb_inds + k), (void *) ri_fps->record_indices, (size_t) n_inds * sizeof(RECORD_INDEX_m12));
+				k += n_inds;
 			}
 		}
 	}
-	if (n_recs == 0) {
-		free((void *) rec_times);
-		return(NULL);
-	}
 
-	// sort record times
-	qsort((void *) rec_times, n_recs, sizeof(si8), CMP_compare_si8_m12);
-	
-	// remove duplicates
-	si8_p1 = rec_times;
-	si8_p2 = si8_p1 + 1;
-	rec_end = rec_times + n_recs;
-	while (si8_p2 != rec_end) {
-		if (*si8_p1 != *si8_p2)
-			*++si8_p1 = *si8_p2++;
-		else
-			si8_p2++;
-	}
-	n_recs = (si8_p1 - rec_times) + 1;
+	// sort combined indices
+	qsort((void *) comb_inds, tot_recs, sizeof(RECORD_INDEX_m12), compare_index_times);
 
-	// create matlab output array
-	n_dims = 2; dims[0] = n_recs; dims[1] = 1;
-	mat_rec_props = mxCreateNumericArray(n_dims, dims, mxDOUBLE_CLASS, mxREAL);
-	rec_props = (sf8 *) mxGetPr(mat_rec_props);
+	// count record types
+	n_recs = (ui4 *) calloc((size_t) NUM_REC_TYPES, sizeof(ui4));
+	for (ri = comb_inds, i = tot_recs; i--; ++ri) {
+		switch (ri->type_code) {
+			case REC_HFOc_TYPE_CODE_m12:
+				++n_recs[REC_HFOc_IDX];
+				break;
+			case REC_NlxP_TYPE_CODE_m12:
+				++n_recs[REC_NlxP_IDX];
+				break;
+			case REC_Note_TYPE_CODE_m12:
+				++n_recs[REC_Note_IDX];
+				break;
+			case REC_Seiz_TYPE_CODE_m12:
+				++n_recs[REC_Seiz_IDX];
+				break;
+			case REC_Sgmt_TYPE_CODE_m12:
+				++n_recs[REC_Sgmt_IDX];
+				break;
+		}
+	}
 	
-	// convert times to proportions of session
-	sess_start_time = globals_m12->session_start_time;
-	sess_end_time = globals_m12->session_end_time;
-	sess_dur = (sf8) (sess_end_time - sess_start_time);
+	// allocate matlab arrays
+	n_dims = (mwSize) 2; dims[0] = (mwSize) NUM_REC_TYPES; dims[1] = (mwSize) 1;
+	rec_props = (sf8 **) calloc((size_t) NUM_REC_TYPES, sizeof(sf8 *));
+	mat_rec_props = mxCreateCellArray(n_dims, dims);
+	for (i = 0; i < NUM_REC_TYPES; ++i) {
+		if (n_recs[i]) {
+			dims[0] = (mwSize) n_recs[i];
+			tmp_mxa = mxCreateNumericArray(n_dims, dims, mxDOUBLE_CLASS, mxREAL);
+			rec_props[i] = (sf8 *) mxGetPr(tmp_mxa);
+			mxSetCell(mat_rec_props, (mwIndex) i, tmp_mxa);
+		}
+	}
 	
-	for (i = 0; i < n_recs; ++i)
-		rec_props[i] = (sf8) (rec_times[i] - sess_start_time) / sess_dur;
-	
+	// divide record types & compute session proportions
+	sess_start_time = (sf8) globals_m12->session_start_time;
+	sess_dur = (sf8) globals_m12->session_end_time - sess_start_time;
+	for (ri = comb_inds, i = tot_recs; i--; ++ri) {
+		switch (ri->type_code) {
+			case REC_HFOc_TYPE_CODE_m12:
+				idx = REC_HFOc_IDX;
+				break;
+			case REC_NlxP_TYPE_CODE_m12:
+				idx = REC_NlxP_IDX;
+				break;
+			case REC_Note_TYPE_CODE_m12:
+				idx = REC_Note_IDX;
+				break;
+			case REC_Seiz_TYPE_CODE_m12:
+				idx = REC_Seiz_IDX;
+				break;
+			case REC_Sgmt_TYPE_CODE_m12:
+				idx = REC_Sgmt_IDX;
+				break;
+			default:
+				continue;
+		}
+		
+		// calculate proportion
+		rec_prop = rec_props[idx]++;
+		*rec_prop = ((sf8) ri->start_time - sess_start_time) / sess_dur;
+	}
+		
 	// clean up
-	free((void *) rec_times);
+	free((void *) comb_inds);
+	free((void *) n_recs);
 
 	return(mat_rec_props);
 }
+
+
+#ifndef WINDOWS_m12  // inline causes linking problem in Windows
+inline
+#endif
+si4     compare_index_times(const void *a, const void * b)
+{
+	RECORD_INDEX_m12	*ria, *rib;
+	
+	
+	ria = (RECORD_INDEX_m12 *) a;
+	rib = (RECORD_INDEX_m12 *) b;
+	
+	if (ria->start_time > rib->start_time)
+		return(1);
+	else if (ria->start_time < rib->start_time)
+		return(-1);
+	return(0);
+}
+

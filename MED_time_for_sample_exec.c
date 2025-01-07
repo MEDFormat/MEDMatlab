@@ -190,16 +190,13 @@ mxArray     *MED_time_for_sample(mxArray *samples, si1 *MED_directory, si1 *pass
 	chan = G_open_channel_m12(NULL, &slice, MED_directory, flags, password);  // threaded version
 	if (chan == NULL) {
 		if (globals_m12->password_data.processed == 0) {
-			G_warning_message_m12("\n%s():\nCannot read channel => no matching input files.\n", __FUNCTION__);
+			G_warning_message_m12("%s(): cannot open channel => no matching input files\n", __FUNCTION__);
 		} else {
-			if (*globals_m12->password_data.level_1_password_hint || *globals_m12->password_data.level_2_password_hint) {
-				G_warning_message_m12("\n%s():\nCannot read channel => Check that the password is correct.\n", __FUNCTION__);
-				G_show_password_hints_m12(NULL);
-			} else {
-				G_warning_message_m12("\n%s():\nCannot read channel => Check that the password is correct, and that metadata files exist.\n", __FUNCTION__);
-			}
+			if (*globals_m12->password_data.level_1_password_hint || *globals_m12->password_data.level_2_password_hint)
+				G_warning_message_m12("%s(): cannot open channel => check that the password is correct\n", __FUNCTION__);
+			else
+				G_warning_message_m12("%s(): cannot open channel => check that the password is correct, and that metadata files exist\n", __FUNCTION__);
 		}
-		putchar_m12('\n');
 		return(NULL);
 	}
 
