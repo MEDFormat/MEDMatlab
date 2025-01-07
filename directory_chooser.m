@@ -77,7 +77,6 @@ function [directories, parent_directory] = directory_chooser(varargin)
         'Position',[200 175 298 695], ...
         'HandleVisibility','on', ...
         'IntegerHandle','off', ...
-        'Renderer','painters', ...
         'Toolbar','none', ...
         'Menubar','none', ...
         'NumberTitle','off', ...
@@ -88,7 +87,7 @@ function [directories, parent_directory] = directory_chooser(varargin)
     panelColor = get(fig, 'Color');
 
     % Axes
-    ax = axes('parent', fig, ...
+    axes('parent', fig, ...
         'Units', 'pixels', ...
         'Position', [1 1 298 695], ...
         'Xlim', [1 700], 'Ylim', [1 700], ...
@@ -137,7 +136,7 @@ function [directories, parent_directory] = directory_chooser(varargin)
         'Callback', @directoryListboxCallback);
     
     % Select Pushbutton
-    selectPushbutton = uicontrol(fig, ...
+    uicontrol(fig, ...
         'Style', 'pushbutton', ...
         'String', 'Select', ...
         'Position', [60 25 180 30], ...
@@ -194,7 +193,7 @@ function [directories, parent_directory] = directory_chooser(varargin)
         n_selected = length(selected);
         
         % double click (no double click on multiple selection for now)
-        if (n_selected == 1)
+        if (n_selected == 1) %#ok<ISCL>
             if (strcmp(get(gcf, 'selectiontype'), 'open') == true)
                 % up one level
                 if (strcmp(selected, '..') == true)
@@ -255,7 +254,7 @@ function [directories, parent_directory] = directory_chooser(varargin)
         % dialog
         add_server_dlg = dialog('Position', [400 400 300 150], ...
             'Name', 'Add Server');
-        dlg_txtbx_label = uicontrol('Parent', add_server_dlg, ...
+        uicontrol('Parent', add_server_dlg, ...
             'Style', 'text', ...
             'Position', [10 88 70 30], ...
             'HorizontalAlignment', 'right', ...
@@ -269,7 +268,7 @@ function [directories, parent_directory] = directory_chooser(varargin)
             'Position', [95 20 70 25], ...
             'String', 'Add', ...
             'Callback', @dlgButtonsCallback);
-        dlg_clear_btn = uicontrol('Parent', add_server_dlg, ...
+        uicontrol('Parent', add_server_dlg, ...
             'Style', 'pushbutton', ...
             'Position', [15 20 70 25], ...
             'String', 'Clear', ...
@@ -303,6 +302,7 @@ function [directories, parent_directory] = directory_chooser(varargin)
                     d(num_servers).name = name;
 
                     % sort
+                    serverList = cell(num_servers, 1);
                     for i = 1:num_servers
                         serverList{i} = d(i).name;
                     end
@@ -373,7 +373,7 @@ function [directories, parent_directory] = directory_chooser(varargin)
         else
             parentDirectoryString = '';
             for i = 2:parentDirectoryLevels
-                parentDirectoryString = [parentDirectoryString DIR_DELIM char(parentDirectoryList(i))];
+                parentDirectoryString = [parentDirectoryString DIR_DELIM char(parentDirectoryList(i))]; %#ok<AGROW>
             end
         end
     end
@@ -392,7 +392,7 @@ function [directories, parent_directory] = directory_chooser(varargin)
             if (i ~= len)
                 name = d_name((i + 1):length(d_name));
                 parentDirectoryLevels = parentDirectoryLevels + 1;
-                d_list{parentDirectoryLevels} = name;
+                d_list{parentDirectoryLevels} = name; %#ok<AGROW>
             end
             len = i - 1;
             d_name = d_name(1:len);
@@ -488,8 +488,8 @@ function [directories, parent_directory] = directory_chooser(varargin)
     end
 
     function passed_filters = checkStopFilters()
-      passed_filters = true;
-      if (isempty(stop_filters))
+        passed_filters = true;
+        if (isempty(stop_filters))
             return;
         end
         
@@ -560,8 +560,8 @@ function [directories, parent_directory] = directory_chooser(varargin)
                 if (buf(j) == 10 || buf(j) == 13)  % newline or carriage return
                     known_server_count = known_server_count + 1;
                     server_name = buf(i:(j - 1))';
-                    d(known_server_count).isdir = true;
-                    d(known_server_count).name = ['\\' server_name];
+                    d(known_server_count).isdir = true; %#ok<AGROW>
+                    d(known_server_count).name = ['\\' server_name]; %#ok<AGROW>
                     break;
                 end
             end

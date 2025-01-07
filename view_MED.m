@@ -1,12 +1,12 @@
 function view_MED(varargin)
 
     %   view_MED([page], [password])
-    
+    %
     %   Copyright Dark Horse Neuro, 2021
 
     % ------------ Defaults ---------------
     
-    DEFAULT_PASSWORD = 'L2_password';  % example_data password == 'L1_password' or 'L2_password'
+    DEFAULT_PASSWORD = 'L2_password';  % DHN example data passwords: 'L1_password' & 'L2_password'
     DEFAULT_DATA_DIRECTORY = pwd;
     DEFAULT_WINDOW_USECS = 1e7;  % 10 seconds
 
@@ -42,13 +42,46 @@ function view_MED(varargin)
         fprintf(2, '%s', msg);  % 2 == stderr, so prints in red in command window
     end
 
+    % set up default records settings
+    REC_NUM_TYPES = 5;
+    REC_HFOc_IDX = 1;
+    REC_NlxP_IDX = 2;
+    REC_Note_IDX = 3;
+    REC_Seiz_IDX = 4;
+    REC_Sgmt_IDX = 5;
+    rec_settings = cell(REC_NUM_TYPES, 1);
+
+    % set colors
+    LIGHT_BLUE = [0.30 0.75 0.93]; %#ok<NASGU>
+    DARK_BLUE = [0.0 0.45 0.74];
+    DARK_ORANGE = [0.91 0.45 0.05];
+    DARK_YELLOW = [0.93 0.69 0.13];
+    DARK_PURPLE = [0.49 0.18 0.56];
+    LIGHT_GREEN = [0.0 0.70 0.0];
+    MEDIUM_GREEN = [0.47 0.67 0.19]; %#ok<NASGU>
+    DARK_GREEN = [0.0 0.45 0.0];
+    DARK_RED = [0.63 0.08 0.18];
+    LIGHT_GRAY = [0.9 0.9 0.9];
+    MEDIUM_GRAY = [0.45 0.45 0.45]; %#ok<NASGU>
+    DARK_GRAY = [0.25 0.25 0.25];
+
+    % get settings path
+    settings_path = which('view_MED');
+    len = length(settings_path) - 10;  % 'view_MED.m'
+    settings_path = settings_path(1:len);
+    settings_path = [settings_path '.vm_settings'];
+    rec_d = [];  % records dialog (global so can leave open)
+    read_rec_settings();
+
+    % set up matrix parameter structure
+    mps = matrix_MED('numeric');
+    mps.Persist = 4;  % read
+    mps.Detrend = 1;
+    mps.Contigua = 1;
+    mps.ChanFreqs = 1;
+
     FORWARD = 1;
     BACKWARD = 2;
-    LIGHT_GRAY = [0.9 0.9 0.9];
-    DARK_GRAY = [0.45 0.45 0.45];
-    VERY_DARK_GRAY = [0.25 0.25 0.25];
-    DARK_GREEN = [0.0 0.45 0.0];
-    LIGHT_GREEN = [0.0 0.70 0.0];
 
     panel_color = get(0,'DefaultUicontrolBackgroundColor');
     pix_per_cm = get(groot, 'ScreenPixelsPerInch') / 2.54;
@@ -372,7 +405,6 @@ function view_MED(varargin)
     % Records Checkbox
     records_checkbox = uicontrol(fig, ...
         'Style', 'checkbox', ...
-        'String', 'Records', ...
         'Value', 0, ...
         'BackgroundColor', panel_color, ...
         'FontSize', SYS_FONT_SIZE, ...
@@ -381,6 +413,17 @@ function view_MED(varargin)
         'Interruptible', 'off', ...
         'BusyAction', 'cancel', ...
         'Callback', @records_callback);
+
+    % Records Button
+    records_button = uicontrol(fig, ...
+        'Style', 'pushbutton', ...
+        'Units', 'pixels', ...
+        'String', 'Records', ...
+        'FontSize', SYS_FONT_SIZE, ...
+        'FontName', 'FixedWidth', ...
+        'Interruptible', 'off', ...
+        'BusyAction', 'cancel', ...
+        'Callback', @records_button_callback);
 
     % Trace Ranges Checkbox
     ranges_checkbox = uicontrol(fig, ...
@@ -420,6 +463,7 @@ function view_MED(varargin)
     sess = [];
     password = DEFAULT_PASSWORD;
     chan_paths = {};
+    mps.Data = {};
     chan_labels = {};
     x_tick_labels = {};
     label_ax_width = 0;
@@ -440,6 +484,7 @@ function view_MED(varargin)
             password = varargin{2};
             if isstring(password)
                 password = char(password);
+                mps.Pass = password;
             end
         end
     end
@@ -476,6 +521,7 @@ function view_MED(varargin)
         for ii = 1:n_chans
             chan_paths{ii} = [sess_dir DIR_DELIM chan_list{ii}];
         end
+        mps.Data = chan_paths;
         page_start = 0;
         page_end = -DEFAULT_WINDOW_USECS;  % set limits to default page width
     else  % get channels & page limits from passed session
@@ -487,6 +533,7 @@ function view_MED(varargin)
             chan_paths{ii} = sess.channels(ii).metadata.path;
             chan_list{ii} = sess.channels(ii).name;
         end
+        mps.Data = chan_paths;
         page_start = sess.metadata.slice_start_time;
         page_end = sess.metadata.slice_end_time;
         wind_usecs = (page_end - page_start) + 1;
@@ -520,6 +567,7 @@ function view_MED(varargin)
             chan_paths{ii} = sess.channels(ii).metadata.path;
             chan_list{ii} = sess.channels(ii).metadata.channel_name;
         end
+        mps.Data = chan_paths;
         page_start = sess.metadata.start_time;
         page_end = (page_start + wind_usecs) - 1;
     end
@@ -538,12 +586,14 @@ function view_MED(varargin)
     NEGATIVE_UP = 1;  % data y axis is inverted
     NEGATIVE_DOWN = -1;
     amplitude_direction = NEGATIVE_UP;
-    baseline_correct_flag = true;
+    mps.Detrend = true;
     monochrome_flag = false;
-    antialias_flag = true;
+    AA_FILT = 0; % 0 antialias, 1 none  (may offer others in future (DO NOT convert to logical))
+    NO_FILT = 1;
+    mps.Filt = AA_FILT;  % antialias
     autoscale_flag = true;
-    ranges_flag = false;
-    records_flag = false;
+    mps.Ranges = false;
+    mps.Records = false;
     add_record_flag = false;
     calendar_time_flag = true;
     uUTC_flag = false;
@@ -559,7 +609,7 @@ function view_MED(varargin)
             discontigua{ii}.end_time = double(tmp_disconts(ii).end_time);
             discontigua{ii}.start_prop = double(tmp_disconts(ii).start_proportion);
             discontigua{ii}.end_prop = double(tmp_disconts(ii).end_proportion);
-            % Z coordinate 1's hold patch in "front"
+            % Z coordinate 1's put patch above current page, but below record lines
             discontigua{ii}.patch = patch(sess_map_ax, ...
                 [1, 1, 1, 1], [0, sess_map_ax_height, sess_map_ax_height, 0], [1, 1, 1, 1], ...
                 DARK_GRAY, 'EdgeColor', 'none', 'ButtonDownFcn', @sess_map_callback);
@@ -567,7 +617,7 @@ function view_MED(varargin)
     end
     clear tmp_disconts;
 
-    % Z coordinate 0's hold patch in "back" (behind contigua patches)
+    % Z coordinate 0's put patch below contigua & record lines
     curr_page_patch = patch(sess_map_ax, ...
         [1, 1, 1, 1], [0, sess_map_ax_height, sess_map_ax_height, 0], [0, 0, 0, 0], ...
         'red', 'EdgeColor', 'none', ...
@@ -609,7 +659,9 @@ function view_MED(varargin)
             % get new data
             set_page_limits();
             screen_sf = (full_page_width * double(1e6)) / double(wind_usecs);
-            raw_page = matrix_MED_exec(chan_paths, full_page_width, page_start, page_end, password, antialias_flag, baseline_correct_flag, ranges_flag, 4);  % 'read' mode
+            mps.Start = page_start;
+            mps.End = page_end;
+            raw_page = matrix_MED_exec(mps);
             if (isempty(raw_page))
                 errordlg('Error reading data', 'View MED');
                 return;
@@ -634,18 +686,20 @@ function view_MED(varargin)
             end
             
             % see if any channels were antialiased
-            antialiased_channels = false;
-            if (antialias_flag == true)
+            antialiased_channels = 0;
+            if (mps.Filt == AA_FILT)
                 for i = 1:n_chans
-                    sf = raw_page.sampling_frequencies(i);
-                    if (screen_sf < sf)
-                        antialiased_channels = true;
-                        break;
+                    if (screen_sf < raw_page.channel_sampling_frequencies(i))
+                        antialiased_channels = antialiased_channels + 1;
                     end
                 end
             end
-            if (antialiased_channels == true)
-                    set(antialias_button, 'String', ['Antialiasing at ' num2str(screen_sf / 4, '%0.0f') ' Hz']);
+            if (antialiased_channels)
+                    aa_str = ['Antialiasing at ' num2str(screen_sf / 4, '%0.0f') ' Hz'];
+                    if (antialiased_channels < n_chans)
+                        aa_str = [aa_str '*'];  % asterisk indicates not all channels were filtered
+                    end
+                    set(antialias_button, 'String', aa_str);              
             else
                     set(antialias_button, 'String', 'Antialiasing is Off');            
             end
@@ -654,17 +708,17 @@ function view_MED(varargin)
   
         % page, mins, maxs have scaling, inversion, & offsetting (use copy)
         page = raw_page.samples;
-        if (ranges_flag == true)
-            mins = raw_page.minima;
-            maxs = raw_page.maxima;
+        if (mps.Ranges == true)
+            mins = raw_page.range_minima;
+            maxs = raw_page.range_maxima;
         end       
 
         % subtract trace means to keep highly offset traces on screen
-        if (baseline_correct_flag == false)
+        if (mps.Detrend == false)
             for i = 1:n_chans
                 tr_mn = mean(page(:, i));
                 page(:, i) = page(:, i) - tr_mn;
-                if (ranges_flag == true)
+                if (mps.Ranges == true)
                     mins(:, i) = mins(:, i) - tr_mn;
                     maxs(:, i) = maxs(:, i) - tr_mn;
                 end
@@ -675,7 +729,7 @@ function view_MED(varargin)
         pix_per_trace = data_ax_height / (n_chans + 1);
         if (autoscale_flag == true)
              % Matlab quantile() requires Statistics and Machine Learning Toolbox
-            if (ranges_flag == false)
+            if (mps.Ranges == false)
                 q = local_quantile(page, [0.01, 0.99]);
             else
                 q(1) = local_quantile(mins, 0.01);
@@ -693,7 +747,7 @@ function view_MED(varargin)
         set(gain_textbox, 'String', num2str(uV_per_cm, '%0.0f'));
         scale = scale * amplitude_direction;
         page = page * scale;
-        if (ranges_flag == true)
+        if (mps.Ranges == true)
             mins = mins * scale;
             maxs = maxs * scale;
         end
@@ -704,7 +758,7 @@ function view_MED(varargin)
         for i = 1:n_chans
             r_offset = round(offset);
             page(:, i) = page(:, i) + r_offset;
-            if (ranges_flag == true)
+            if (mps.Ranges == true)
                 mins(:, i) = mins(:, i) + r_offset;
                 maxs(:, i) = maxs(:, i) + r_offset;
             end
@@ -744,7 +798,7 @@ function view_MED(varargin)
         end
 
         % draw trace range patches
-        if (ranges_flag == true)
+        if (mps.Ranges == true)
             range_patches = cell(n_chans, 1);
             for i = 1:n_chans
                     patch_x = [(x_ax_inds(1):x_ax_inds(end))' ; (x_ax_inds(end):-1:x_ax_inds(1))'];
@@ -769,31 +823,44 @@ function view_MED(varargin)
             discont_lines = cell(n_contigua - 1, 1);
             for i = 2:n_contigua
                 sess_map_x = double(raw_page.contigua(i).start_index) + (x_ax_inds(1) - 1);
-                discont_lines{i - 1}.line = line(data_ax, [sess_map_x, sess_map_x], [20 data_ax_height], 'color', VERY_DARK_GRAY, 'LineWidth', 2, 'LineStyle', '--');
+                discont_lines{i - 1}.line = line(data_ax, [sess_map_x, sess_map_x], [20 data_ax_height], 'color', DARK_GRAY, 'LineWidth', 2, 'LineStyle', '--');
                 patch_x = [-1, 11, 2, 7, -3, 2, -6, -1] + sess_map_x;
                 patch_y = [1, 1, 5, 10, 15, 10, 5, 1];
-                discont_lines{i - 1}.zag = patch(data_ax, patch_x, patch_y, VERY_DARK_GRAY, 'EdgeColor', 'none', 'ButtonDownFcn', @discont_line_callback);
+                discont_lines{i - 1}.zag = patch(data_ax, patch_x, patch_y, DARK_GRAY, 'EdgeColor', 'none', 'ButtonDownFcn', @discont_line_callback);
             end
         end
 
         % clear old record lines
         if (~isempty(record_lines))
             for i = 1:numel(record_lines)
-                delete(record_lines{i}.line);
-                delete(record_lines{i}.flag);
+                if (~isempty(record_lines{i}))
+                    delete(record_lines{i}.line);
+                    delete(record_lines{i}.flag);
+                end
             end
             record_lines = [];
         end
 
         % draw record lines
-        if (records_flag == true)
+        if (mps.Records == true)
             record_lines = cell(numel(raw_page.records), 1);
             for i = 1:numel(record_lines)
                 sess_map_x = double(raw_page.records{i}.start_index) + (x_ax_inds(1) - 1);
-                record_lines{i}.line = line(data_ax, [sess_map_x, sess_map_x], [20 data_ax_height], 'color', DARK_GREEN, 'LineWidth', 2, 'LineStyle', '--');
-                patch_x = [-1, 19, 14, 19, -1, -1] + sess_map_x;
-                patch_y = [1, 1, 7, 14, 14, 1];
-                record_lines{i}.flag = patch(data_ax, patch_x, patch_y, DARK_GREEN, 'EdgeColor', 'none', 'ButtonDownFcn', @rec_line_callback);
+                code = raw_page.records{i}.type_code;
+                for j = 1:REC_NUM_TYPES
+                    if (rec_settings{j}.display == false)
+                        continue;
+                    end
+                    if (code == rec_settings{j}.type_code)
+                        col = rec_settings{j}.color;
+                        record_lines{i}.line = line(data_ax, [sess_map_x, sess_map_x], [20 data_ax_height], 'color', col , 'LineWidth', 2, 'LineStyle', '--');
+                        patch_x = [-1, 19, 14, 19, -1, -1] + sess_map_x;
+                        patch_y = [1, 1, 7, 14, 14, 1];
+                        record_lines{i}.flag = patch(data_ax, patch_x, patch_y, col, 'EdgeColor', 'none', 'ButtonDownFcn', @rec_line_callback);
+                        break;
+                    end
+                end
+                
             end
         end
 
@@ -955,14 +1022,42 @@ function view_MED(varargin)
 
     function plot_sess_record_times()
 
-        ax_locs = round(sess_record_times * sess_map_ax_width);
-        ax_locs = unique(ax_locs);  % potentially a lot of overlap
-        n_lines = numel(ax_locs);
-        delete(sess_map_records_lines);
-        sess_map_records_lines = gobjects(n_lines, 1);
-        for i = 1:n_lines
-            x = ax_locs(i);
-            sess_map_records_lines(i) = line(sess_map_ax, [x x], [0 sess_map_ax_height], [-1 -1], 'Color', DARK_GREEN, 'ButtonDownFcn', @sess_map_callback);  % Z coords put display below page patch
+        if (~isempty(sess_map_records_lines))
+            for i = 1:REC_NUM_TYPES
+                delete(sess_map_records_lines{i});
+            end
+        end
+        if (records_checkbox.Value == false)
+            return;
+        end
+
+        sess_map_records_lines = cell(REC_NUM_TYPES, 1);
+        for i = 1:REC_NUM_TYPES
+            if (rec_settings{i}.display == false)
+                continue;
+            end
+            n_lines = numel(sess_record_times{i});
+            if (n_lines == 0)
+                continue;
+            end
+            ax_locs = round(sess_record_times{i} * sess_map_ax_width);
+            ax_locs = unique(ax_locs);  % potentially a lot of overlap
+            n_lines = numel(ax_locs);
+            sess_map_records_lines{i} = gobjects(n_lines, 1);
+
+            % layers
+            % 0: current page
+            % 1: discontigua
+            % 2: HFOs
+            % 3: Notes
+            % 4: Port Values
+            % 5: Seizures
+            % 6: Segments
+            layer = i + 1;
+            for j = 1:n_lines
+                x = ax_locs(j);
+                sess_map_records_lines{i}(j) = line(sess_map_ax, [x x], [0 sess_map_ax_height], [layer, layer], 'Color', rec_settings{i}.color, 'ButtonDownFcn', @sess_map_callback);
+            end
         end
         clear ax_locs;
     end
@@ -980,6 +1075,121 @@ function view_MED(varargin)
         end
         clear sorted_page;
     end
+
+    function read_rec_settings()
+    
+        fp = fopen(settings_path, 'r');
+        if (fp == -1)
+            rec_settings{REC_HFOc_IDX} = struct;
+            rec_settings{REC_HFOc_IDX}.type_str = 'HFOc';
+            rec_settings{REC_HFOc_IDX}.type_code = uint32(0x634F4648);
+            rec_settings{REC_HFOc_IDX}.label = 'High Frequency Oscillation';
+            rec_settings{REC_HFOc_IDX}.color = DARK_YELLOW;
+            rec_settings{REC_HFOc_IDX}.color_str = 'Yellow';
+            rec_settings{REC_HFOc_IDX}.display = true;
+        
+            rec_settings{REC_NlxP_IDX} = struct;
+            rec_settings{REC_NlxP_IDX}.type_str = 'NlxP';
+            rec_settings{REC_NlxP_IDX}.type_code = uint32(0x50786C4E);
+            rec_settings{REC_NlxP_IDX}.label = 'Neuralynx Port Value';
+            rec_settings{REC_NlxP_IDX}.color = DARK_ORANGE;
+            rec_settings{REC_NlxP_IDX}.color_str = 'Orange';
+            rec_settings{REC_NlxP_IDX}.display = true;
+
+            rec_settings{REC_Note_IDX} = struct;
+            rec_settings{REC_Note_IDX}.type_str = 'Note';
+            rec_settings{REC_Note_IDX}.type_code = uint32(0x65746f4e);
+            rec_settings{REC_Note_IDX}.label = 'Annotation';
+            rec_settings{REC_Note_IDX}.color = DARK_GREEN;
+            rec_settings{REC_Note_IDX}.color_str = 'Green';
+            rec_settings{REC_Note_IDX}.display = true;
+        
+            rec_settings{REC_Seiz_IDX} = struct;
+            rec_settings{REC_Seiz_IDX}.type_str = 'Seiz';
+            rec_settings{REC_Seiz_IDX}.type_code = uint32(0x7a696553);
+            rec_settings{REC_Seiz_IDX}.label = 'Seizure';
+            rec_settings{REC_Seiz_IDX}.color = DARK_RED;
+            rec_settings{REC_Seiz_IDX}.color_str = 'Red';
+            rec_settings{REC_Seiz_IDX}.display = true;
+        
+            rec_settings{REC_Sgmt_IDX} = struct;
+            rec_settings{REC_Sgmt_IDX}.type_str = 'Sgmt';
+            rec_settings{REC_Sgmt_IDX}.type_code = uint32(0x746D6753);
+            rec_settings{REC_Sgmt_IDX}.label = 'Segment';
+            rec_settings{REC_Sgmt_IDX}.color = DARK_BLUE;
+            rec_settings{REC_Sgmt_IDX}.color_str = 'Blue';
+            rec_settings{REC_Sgmt_IDX}.display = true;
+
+            write_rec_settings();
+        else
+            buf = fread(fp, 'char=>char');
+            fclose(fp);
+
+            buf = buf';
+            len = length(buf);
+            j = 1;
+            for i = 1:REC_NUM_TYPES
+                rec_settings{i} = struct;
+                rec_settings{i}.type_str = buf(j:j + 3);
+                j = j + 8; 
+                str = buf(j:j + 7);
+                rec_settings{i}.type_code = sscanf(str, '%x');
+                % advance next entry
+                j = j + 10;
+                k = j + 1;
+                while (buf(k) ~= ',')
+                    k = k + 1;
+                end
+                rec_settings{i}.label = buf(j:(k - 1));
+                j = k + 2;
+                k = j + 1;
+                while (buf(k) ~= ',')
+                    k = k + 1;
+                end
+                str = buf(j:(k - 1));
+                switch (str)
+                    case 'Red'
+                        rec_settings{i}.color = DARK_RED;
+                    case 'Orange'
+                        rec_settings{i}.color = DARK_ORANGE;
+                    case 'Yellow'
+                        rec_settings{i}.color = DARK_YELLOW;
+                    case 'Green'
+                        rec_settings{i}.color = DARK_GREEN;
+                    case 'Blue'
+                        rec_settings{i}.color = DARK_BLUE;
+                    case 'Purple'
+                        rec_settings{i}.color = DARK_PURPLE;
+                end
+                rec_settings{i}.color_str = str;
+                j = k + 2;
+                if (buf(j) == '1')
+                    rec_settings{i}.display = true;
+                else
+                    rec_settings{i}.display = false;
+                end
+                while (buf(j) ~= 10 && buf(j) ~= 13)
+                    j = j + 1;
+                end
+                j = j + 1;
+            end
+        end
+    end
+
+    function write_rec_settings()
+        fp = fopen(settings_path, 'w');
+        if (fp == -1)
+            errordlg('Cannot create records settings file', 'View MED');
+            return;
+        end
+
+        for i = 1:REC_NUM_TYPES
+            str = sprintf('%s, 0x%08x, %s, %s, %d\n', rec_settings{i}.type_str, rec_settings{i}.type_code, rec_settings{i}.label, rec_settings{i}.color_str, rec_settings{i}.display);
+            fwrite(fp, str);
+        end
+        fclose(fp);
+    end
+
 
 % ------------ Callback Functions ---------------
 
@@ -1044,6 +1254,7 @@ function view_MED(varargin)
         x_tick_inds = linspace(1, data_ax_width, 11);
         set_data_ax_x_labels();
         full_page_width = data_ax_width;
+        mps.SampDim = full_page_width;
         data_ax_bot = fig_bot + 165;
         data_ax_top = fig_top - 50;
         data_ax_height = (data_ax_top - data_ax_bot) + 1;
@@ -1124,6 +1335,7 @@ function view_MED(varargin)
         
         set(deselect_all_button, 'Position', [34, (data_ax_bot - 25), 81, 20]);
         set(records_checkbox, 'Position', [30, (data_ax_bot - 50), 117, 20]);
+        set(records_button, 'Position', [53, (data_ax_bot - 47), 72, 14]);
         set(ranges_checkbox, 'Position', [30, (data_ax_bot - 68), 117, 20]);
         set(monochrome_checkbox, 'Position', [30, (data_ax_bot - 86), 117, 20]);
 
@@ -1140,7 +1352,7 @@ function view_MED(varargin)
         end
 
         % draw session map record lines
-        if (records_flag == true)
+        if (mps.Records == true)
             plot_sess_record_times();
         end
 
@@ -1241,11 +1453,7 @@ function view_MED(varargin)
 
         switch key
             case 'rightarrow'
-                if (page_shift == wind_usecs)
-                    page_start = page_end + 1;
-                else
-                    page_start = page_start + page_shift;
-                end
+                page_start = page_start + page_shift;
                 movement_direction = FORWARD;
             case 'leftarrow'
                 page_start = page_start - page_shift;
@@ -1387,10 +1595,10 @@ function view_MED(varargin)
 	% Antialias Callback
     function antialias_callback(~, ~)
         % set button text in plot_page() in case no traces need antialisiang
-        if (antialias_flag == true)
-            antialias_flag = false;
+        if (mps.Filt == AA_FILT)
+            mps.Filt = NO_FILT;
         else
-            antialias_flag = true;
+            mps.Filt = AA_FILT;
             potentially_increased_plot_time = true;
         end
 
@@ -1400,13 +1608,13 @@ function view_MED(varargin)
 
 	% Baseline Callback
     function baseline_callback(src, ~)
-        if (baseline_correct_flag == true)
+        if (mps.Detrend == true)
             set(src, 'String', 'Baseline Correction is Off');
-            baseline_correct_flag = false;
+            mps.Detrend = false;
         else
             set(src, 'String', 'Baseline Correction is On');
             potentially_increased_plot_time = true;
-            baseline_correct_flag = true;
+            mps.Detrend = true;
         end
 
         plot_page(true);
@@ -1552,8 +1760,9 @@ function view_MED(varargin)
         % remove all
         elseif (j == 0 && val == 0)
             errordlg('At least one channel must be selected', 'View MED');
-            chan_paths = [];
-            chan_list = [];
+            chan_paths = {};
+            mps.Data = {};
+            chan_list = {};
             n_chans = 0;
             add_channels_callback();
             return;
@@ -1561,9 +1770,11 @@ function view_MED(varargin)
 
         n_chans = j;
         chan_paths = chan_paths(1:n_chans);
+        mps.Data = chan_paths;
         chan_list = chan_list(1:n_chans);
-
-        [~] = matrix_MED_exec(chan_paths, full_page_width, page_start, page_end, password, [], [], [], 2);  % close matrix to reset channel dimension
+        mps.Persist = 2; % close
+        [~] = matrix_MED_exec(mps);  % close to reset channel dimension
+        mps.Persist = 4; % read
         plot_handles = [];
         if (autoscale_flag == false)  % rescale plots for new trace set
             set(autoscale_button, 'String', 'Autoscaling is On');
@@ -1607,9 +1818,17 @@ function view_MED(varargin)
         end
         chan_paths = unique(chan_paths);
 
-        % put new channel set in acquisition channel order with read_MED (not efficient, but probably not frequent)
-        sess = read_MED_exec(chan_paths, page_start, page_start + 1e6, [], [], password);
-        clear read_MED_exec;
+        % close & reopen (not efficient, but probably not frequent)
+        mps.Persist = 2;  % close
+        [~] = matrix_MED_exec(mps);  % close matrix to force re-read
+        mps.Persist = 4;  % read
+        rps = read_MED('numeric');
+        rps.Data = chan_paths;
+        rps.Start = page_start;
+        rps.End = page_start + 1e6;
+        rps.Pass = password;
+        sess = read_MED_exec(rps);
+        clear read_MED_exec rps;
         if (isempty(sess))
             errordlg('read_MED() error', 'View MED');
             return;
@@ -1621,6 +1840,7 @@ function view_MED(varargin)
             chan_paths{i} = sess.channels(i).metadata.path;
             chan_list{i} = sess.channels(i).name;
         end
+        mps.Data = chan_paths;
         page_start = sess.metadata.slice_start_time;
         page_end = (page_start + wind_usecs) - 1;
         clear sess;
@@ -1703,21 +1923,26 @@ function view_MED(varargin)
                 set(d, 'Pointer', 'watch'); 
                 drawnow;
             end
-            expt_sess = read_MED_exec(chan_paths, page_start, page_end, [], [], password);
-            clear read_MED_exec;
+            rps = read_MED('numeric');
+            rps.Data = chan_paths;
+            rps.Start = page_start;
+            rps.End = page_end;
+            rps.Pass = password;            
+            expt_sess = read_MED_exec(rps);
+            clear read_MED_exec rps;
             if (isempty(expt_sess))
                 close(d);
                 errordlg('read_MED() error', 'View MED');
                 return;
             end
             if (d_dsp_radbtn.Value == true)  % assign raw page data to session structure    
-                if (antialias_flag == true && expt_sess.metadata.sampling_frequency > screen_sf)
+                if (mps.Filt == AA_FILT && expt_sess.metadata.sampling_frequency > screen_sf)
                         expt_sess.metadata.high_frequency_filter_setting = screen_sf / 4;
                 end
                 expt_sess.metadata.sampling_frequency = screen_sf;
                 for i = 1:n_chans
                     expt_sess.channels(i).data = raw_page.samples(:, i);
-                    if (antialias_flag == true && expt_sess.channels(i).metadata.sampling_frequency > screen_sf)
+                    if (mps.Filt == AA_FILT && expt_sess.channels(i).metadata.sampling_frequency > screen_sf)
                         expt_sess.channels(i).metadata.high_frequency_filter_setting = screen_sf / 4;
                     end
                     expt_sess.channels(i).metadata.sampling_frequency = screen_sf;
@@ -1837,7 +2062,7 @@ function view_MED(varargin)
     % Trace Ranges Callback
     function trace_ranges_callback(~, ~)
         if (ranges_checkbox.Value == true)
-            ranges_flag = true;
+            mps.Ranges = true;
             potentially_increased_plot_time = true;
             plot_page(true);  % need raw data to generate trace ranges
         else
@@ -1848,7 +2073,7 @@ function view_MED(varargin)
                 end
                 range_patches = [];
             end
-            ranges_flag = false;
+            mps.Ranges = 0;
             autoscale_flag = true;  % rescale traces
             potentially_increased_plot_time = false;
             plot_page(false);  % have raw data
@@ -1859,33 +2084,217 @@ function view_MED(varargin)
     % Records Callback
     function records_callback(~, ~)
         if (records_checkbox.Value == true)
-            records_flag = true;
+            mps.Records = true;
             plot_sess_record_times();
-            plot_page(false);
+            plot_page(true);
         else
-            records_flag = false;
+            mps.Records = false;
             % clear old record lines (don't need to plot)
             if (~isempty(record_lines))
                 for i = 1:numel(record_lines)
-                    delete(record_lines{i}.line);
-                    delete(record_lines{i}.flag);
+                    if (~isempty(record_lines{i}))
+                        delete(record_lines{i}.line);
+                        delete(record_lines{i}.flag);
+                    end
                 end
                 record_lines = [];
             end
-            delete(sess_map_records_lines);
+            if (~isempty(sess_map_records_lines))
+                for i = 1:REC_NUM_TYPES
+                    delete(sess_map_records_lines{i});
+                end
+                sess_map_records_lines = [];
+            end
         end
         set_movement_focus();
     end
 
+    % Records Button Callback
+    function records_button_callback(~, ~)
+
+        if (isempty(rec_d) == false)
+            set(rec_d, 'Position', [700 500 350 230]);
+            figure(rec_d);
+            return;
+        end
+
+        saved_records_checkbox_value = records_checkbox.Value;
+
+        rec_d = dialog('Position', [700 500 350 230], ...
+            'Name', 'Record Settings', ...
+            'Color', panel_color, ...
+            'WindowStyle', 'normal', ...
+            'CloseRequestFcn', @recsCloseCallback);  % make dialog non-modal
+
+        % close
+        uicontrol('Parent', rec_d, ...
+            'Position', [117 10 70 25], ...
+            'String', 'Close',...
+            'Callback', @recsCloseCallback);
+
+        % revert
+        uicontrol('Parent', rec_d, ...
+            'Position', [194 10 70 25], ...
+            'String', 'Revert',...
+            'Callback', @recsRevertCallback);
+
+        % save
+        uicontrol('Parent', rec_d, ...
+            'Position', [271 10 70 25], ...
+            'String', 'Save',...
+            'Callback', @recsSaveCallback);
+
+        % Note record checkbox & dropdown
+        recCheckboxes = cell(REC_NUM_TYPES, 1);
+        recPopups = cell(REC_NUM_TYPES, 1);
+        y_offset = 190;
+        for i = 1:REC_NUM_TYPES
+            recCheckboxes{i} = uicontrol('Parent', rec_d, ...
+                'Position', [120 y_offset 200 25], ...
+                'Style', 'checkbox', ...
+                'String', [rec_settings{i}.label 's'], ...
+                'Value', rec_settings{i}.display, ...
+                'BackgroundColor', panel_color, ...
+                'FontSize', SYS_FONT_SIZE, ...
+                'HorizontalAlignment', 'left', ...
+                'Interruptible', 'off', ...
+                'BusyAction', 'cancel', ...
+                'Callback', @recsApplyCallback);
+
+            % get color value for popup
+            switch (rec_settings{i}.color_str)
+                case 'Red'
+                    col_val = 1;
+                case 'Orange'
+                    col_val = 2;
+                case 'Yellow'
+                    col_val = 3;
+                case 'Green'
+                    col_val = 4;
+                case 'Blue'
+                    col_val = 5;
+                case 'Purple'
+                    col_val = 6;
+                otherwise
+                    col_val = 4;
+            end
+
+            % build HTML strings
+            hmtl_strings = cell(6, 1);
+            part1 = '<HTML><FONT bgcolor="';
+            part2 = '" color="';
+            part3 = '">&nbsp &nbsp &nbsp<FONT bgcolor="#FFFFFF" color="#000000">&nbsp ';
+            part4 = '</FONT></HTML>';
+            hex_str = sprintf('#%02x%02x%02x', round(DARK_RED(1) * 255), round(DARK_RED(2) * 255), round(DARK_RED(3) * 255));
+            hmtl_strings{1} = [part1 hex_str part2 hex_str part3 'Red' part4];
+            hex_str = sprintf('#%02x%02x%02x', round(DARK_ORANGE(1) * 255), round(DARK_ORANGE(2) * 255), round(DARK_ORANGE(3) * 255));
+            hmtl_strings{2} = [part1 hex_str part2 hex_str part3 'Orange' part4];
+            hex_str = sprintf('#%02x%02x%02x', round(DARK_YELLOW(1) * 255), round(DARK_YELLOW(2) * 255), round(DARK_YELLOW(3) * 255));
+            hmtl_strings{3} = [part1 hex_str part2 hex_str part3 'Yellow' part4];
+            hex_str = sprintf('#%02x%02x%02x', round(DARK_GREEN(1) * 255), round(DARK_GREEN(2) * 255), round(DARK_GREEN(3) * 255));
+            hmtl_strings{4} = [part1 hex_str part2 hex_str part3 'Green' part4];
+            hex_str = sprintf('#%02x%02x%02x', round(DARK_BLUE(1) * 255), round(DARK_BLUE(2) * 255), round(DARK_BLUE(3) * 255));
+            hmtl_strings{5} = [part1 hex_str part2 hex_str part3 'Blue' part4];
+            hex_str = sprintf('#%02x%02x%02x', round(DARK_PURPLE(1) * 255), round(DARK_PURPLE(2) * 255), round(DARK_PURPLE(3) * 255));
+            hmtl_strings{6} = [part1 hex_str part2 hex_str part3 'Purple' part4];
+
+            % build popups
+            recPopups{i} = uicontrol('Parent', rec_d, ...
+                'Position', [10 (y_offset + 5) 110 17], ...
+                'Style', 'popupmenu', ...
+                'FontSize', SYS_FONT_SIZE, ...
+                'String', hmtl_strings, ...
+                'Value', col_val, ..., 
+                'HorizontalAlignment', 'left', ...
+                'Interruptible', 'off', ...
+                'BusyAction', 'cancel', ...
+                'Callback', @recsApplyCallback);
+            
+            y_offset = y_offset - 30;
+        end
+
+         % recsApplyCallback (nested)
+        function recsApplyCallback(~, ~)
+            for j = 1:REC_NUM_TYPES
+                switch (recPopups{j}.Value)
+                    case 1
+                        rec_settings{j}.color = DARK_RED;
+                        rec_settings{j}.color_str = 'Red';
+                    case 2
+                        rec_settings{j}.color = DARK_ORANGE;
+                        rec_settings{j}.color_str = 'Orange';
+                    case 3
+                        rec_settings{j}.color = DARK_YELLOW;
+                        rec_settings{j}.color_str = 'Yellow';
+                    case 4
+                        rec_settings{j}.color = DARK_GREEN;
+                        rec_settings{j}.color_str = 'Green';
+                    case 5
+                        rec_settings{j}.color = DARK_BLUE;
+                        rec_settings{j}.color_str = 'Blue';
+                    case 6
+                        rec_settings{j}.color = DARK_PURPLE;
+                        rec_settings{j}.color_str = 'Purple';
+                end
+                rec_settings{j}.display = recCheckboxes{j}.Value;
+            end
+            % show records
+            if (records_checkbox.Value == false)
+                records_checkbox.Value = true;
+                mps.Records = true;
+                new_data = true;
+            else
+                new_data = false;
+            end
+            plot_sess_record_times();
+            plot_page(new_data);
+        end
+
+        % recsRevertCallback (nested)
+        function recsRevertCallback(~, ~)
+            read_rec_settings();
+            for j = 1:REC_NUM_TYPES
+                recPopups{j}.Value = j;
+                recCheckboxes{j}.Value = rec_settings{j}.display;
+            end
+            if (records_checkbox.Value ~= saved_records_checkbox_value)
+                records_checkbox.Value = saved_records_checkbox_value;
+                if (records_checkbox.Value == true)
+                    mps.Records = true;
+                else
+                    mps.Records = false;
+                end
+            end
+            plot_sess_record_times();
+            plot_page(false);
+        end
+
+        % recsSaveCallback (nested)
+        function recsSaveCallback(~, ~)
+            recsApplyCallback([], []);  % apply assumed
+            write_rec_settings();
+        end
+    end
+
+    % Record Setting Dialog Close
+    function recsCloseCallback(~, ~)
+        delete(rec_d);
+        rec_d = [];
+        set_movement_focus();
+    end
+
+
     % Record Line Callback
     function rec_line_callback(src, ~)
 
-        for j = 1:numel(record_lines)
-            if (src == record_lines{j}.flag)
-                rec_idx = j;
-                break;
+        for k = 1:numel(record_lines)
+            if (~isempty(record_lines{k}))
+                if (src == record_lines{k}.flag)
+                    rec_idx = k;
+                    break;
+                end
             end
-        end 
+        end
 
         coords = get(fig, 'Position');    % screen coordinates
         flag_screen_left = coords(1);
@@ -1913,10 +2322,25 @@ function view_MED(varargin)
             case 'Note'
                 title = 'Annotation Record';
                 if strcmp(raw_page.records{rec_idx}.version_string, '1.001')
-                    blurb = [blurb 'End Time: ' raw_page.records{rec_idx}.end_time_string newline ...
-                        'End Time (oUTC): ' num2str(raw_page.records{rec_idx}.end_time) newline];
-               end
+                    blurb = [blurb 'End Time: ' raw_page.records{rec_idx}.end_time_string newline];
+                    if (isempty(raw_page.records{rec_idx}.end_time))
+                        blurb = [blurb 'End Time (oUTC): <no entry>' newline];
+                    else
+                        blurb = [blurb 'End Time (oUTC): ' num2str(raw_page.records{rec_idx}.end_time) newline];
+                    end
+                end
                 blurb = [blurb 'Text: ' raw_page.records{rec_idx}.text];
+            case 'Seiz'
+                title = 'Seizure Record';
+                if strcmp(raw_page.records{rec_idx}.version_string, '1.000')
+                    blurb = [blurb 'End Time: ' raw_page.records{rec_idx}.end_time_string newline];
+                    if (isempty(raw_page.records{rec_idx}.end_time))
+                        blurb = [blurb 'End Time (oUTC): <no entry>' newline];
+                    else
+                        blurb = [blurb 'End Time (oUTC): ' num2str(raw_page.records{rec_idx}.end_time) newline];
+                    end
+                    blurb = [blurb 'Description: ' raw_page.records{rec_idx}.description];
+                end
             case 'Epoc'
                 duration = double((raw_page.records{rec_idx}.end_time - raw_page.records{rec_idx}.start_time) + 1) / double(1e6);
                 duration_string = [num2str(duration) ' (sec)'];
@@ -1965,7 +2389,6 @@ function view_MED(varargin)
                 blurb = [blurb 'Description: ' raw_page.records{rec_idx}.description];             
             otherwise  % unknown record type
                 title = 'Unknown Record';
-                blurb = [blurb 'Comment: ' raw_page.records{rec_idx}.comment];
         end
 
         clipboard('copy', blurb);
@@ -2028,6 +2451,9 @@ function view_MED(varargin)
                 drawnow;
             end
             close(d);
+            mps.Persist = 2;  % close
+            [~] = matrix_MED_exec(mps);  % close to allow writing of record files by delete_record_exec()
+            mps.Persist = 4; % set back to read
             err = delete_record_exec(chan_paths{1}, password, rec_time, rec_code);
             clear delete_record_exec;
             if (err < 0)
@@ -2038,24 +2464,40 @@ function view_MED(varargin)
                     errordlg('Insufficient access to delete record', 'View MED');
                 end
                 return;
+            else
+                delete(record_lines{rec_idx}.line);
+                delete(record_lines{rec_idx}.flag);
             end
 
             % remove session map line
             rec_time_prop = double(rec_time - sess_start) / sess_duration;
-            break_flag = false;
-            for i = 1:numel(sess_record_times)
-                if (sess_record_times(i) == rec_time_prop)
-                    break_flag = true;
+            rec_str = raw_page.records{rec_idx}.type_string;
+            for i = 1:REC_NUM_TYPES
+                switch (rec_str)
+                    case 'HFOc'
+                        rec_type_idx = REC_HFOc_IDX;
+                    case 'NlxP'
+                        rec_type_idx = REC_NlxP_IDX;
+                    case 'Note'
+                        rec_type_idx = REC_Note_IDX;
+                    case 'Seiz'
+                        rec_type_idx = REC_Seiz_IDX;
+                    case 'Sgmt'
+                        rec_type_idx = REC_Sgmt_IDX;
+                end
+            end
+            n_lines = numel(sess_record_times{rec_type_idx});
+            for j = 1:n_lines
+                if (sess_record_times{rec_type_idx}(j) == rec_time_prop)
                     break;
                 end
             end
-            if (break_flag == true)
-                sess_record_times = [sess_record_times(1:(i - 1)); sess_record_times((i + 1):end)];
+            if (j < n_lines)
+                sess_record_times{rec_type_idx} = [sess_record_times{rec_type_idx}(1:(i - 1)); sess_record_times{rec_type_idx}((i + 1):end)];
             else
-                sess_record_times = [sess_record_times(1:(end - 1))];
+                sess_record_times{rec_type_idx} = [sess_record_times{rec_type_idx}(1:(end - 1))];
             end
             plot_sess_record_times();
-
             plot_page(true);
         end
 
@@ -2172,7 +2614,7 @@ function view_MED(varargin)
 
     % Logo Callback
     function logo_callback(~, ~)
-        d = dialog('Position', [400 400 220 140], 'Name', 'About View MED ...', 'Color', 'white');
+        d = dialog('Position', [400 400 220 140], 'Name', 'About View MED', 'Color', 'white');
         
         blurb = ['A Matlab viewer for MED format files' newline newline ...
             'written by Matt Stead' newline newline ...
@@ -2246,7 +2688,8 @@ function view_MED(varargin)
         wind_usecs = wind_usecs * 3;
         x_ax_inds = ((1 - data_ax_width):(2 * data_ax_width))';
         x_tick_inds = linspace(x_ax_inds(1), x_ax_inds(end), 31);
-        full_page_width = data_ax_width * 3; 
+        full_page_width = data_ax_width * 3;
+        mps.SampDim = full_page_width;
         plot_handles = [];
         plot_page(true);
 
@@ -2275,6 +2718,7 @@ function view_MED(varargin)
         x_ax_inds = (1:data_ax_width)';
         x_tick_inds = linspace(1, data_ax_width, 11);
         full_page_width = data_ax_width;
+        mps.SampDim = full_page_width;
         reset_pointer = true;
         plot_handles = [];        
         plot_page(true);
@@ -2290,8 +2734,8 @@ function view_MED(varargin)
 
         fig_pos = get(fig, 'Position');  % convert to data axes coordinates
         xo = (x_orig - fig_pos(1)) - data_ax_left;
-        record_line = [];
-        record_flag = [];
+        new_record_line = [];
+        new_record_flag = [];
         while ax_mouse_down == true
             curr_p = get(0, 'PointerLocation');
             dx = round(curr_p(1)) - x_orig;
@@ -2301,28 +2745,30 @@ function view_MED(varargin)
             end
 
             % clear old record line
-            if (~isempty(record_line))
-                delete(record_line);
-                delete(record_flag);
+            if (~isempty(new_record_line))
+                delete(new_record_line);
+                delete(new_record_flag);
             end
 
             % draw new record line
             data_x = xo + dx;
-            record_line = line(data_ax, [data_x, data_x], [20 data_ax_height], 'color', LIGHT_GREEN, 'LineWidth', 2, 'LineStyle', '--');
+            new_record_line = line(data_ax, [data_x, data_x], [20 data_ax_height], 'color', LIGHT_GREEN, 'LineWidth', 2, 'LineStyle', '--');
             patch_x = [-1, 19, 14, 19, -1, -1] + data_x;
             patch_y = [1, 1, 7, 14, 14, 1];
-            record_flag = patch(data_ax, patch_x, patch_y, LIGHT_GREEN, 'EdgeColor', 'none', 'ButtonDownFcn', @rec_line_callback);
+            new_record_flag = patch(data_ax, patch_x, patch_y, LIGHT_GREEN, 'EdgeColor', 'none', 'ButtonDownFcn', @rec_line_callback);
 
             pause(0.05);  % give ax_mouse_up_callback a chance to run
         end
 
         % show add record dialog
         add_rec = false;
-        note_text = '';
-        enc_level = 0;
+        rec_text = '';
+        rec_type = 'Note';
+        rec_type_idx = REC_Note_IDX;
+        rec_enc = 0;
         d = dialog('Position', [400 400 550 125], 'Name', 'Add Record');
         % Note Textbox & Label
-        uicontrol('Parent', d, ...
+        d_text_label = uicontrol('Parent', d, ...
             'Style', 'text', ...
             'Position', [33 85 60 25], ...
             'Units', 'pixels', ...
@@ -2339,36 +2785,62 @@ function view_MED(varargin)
             'HorizontalAlignment', 'left');
         uicontrol('Parent', d, ...
             'Style', 'text', ...
-            'Position', [33 20 55 25], ...
+            'Position', [33 17 55 25], ...
+            'Units', 'pixels', ...
+            'String', 'Type:', ...
+            'FontSize', SYS_FONT_SIZE, ...
+            'HorizontalAlignment', 'left');    
+        d_type_popup = uicontrol('Parent', d, ...
+            'Style', 'popupmenu', ...
+            'Position', [60 17 105 25], ...
+            'String', {'Annotation', 'Seizure'}, ...
+            'Callback', @d_type_ddCallback);
+        uicontrol('Parent', d, ...
+            'Style', 'text', ...
+            'Position', [183 17 55 25], ...
             'Units', 'pixels', ...
             'String', 'Encryption:', ...
             'FontSize', SYS_FONT_SIZE, ...
             'HorizontalAlignment', 'left');    
         d_enc_popup = uicontrol('Parent', d, ...
             'Style', 'popupmenu', ...
-            'Position', [85 20 105 25], ...
+            'Position', [235 17 105 25], ...
             'String', {'None', 'Level 1','Level 2'});
+        uicontrol('Parent', d, ...
+            'Style', 'pushbutton', ...
+            'Position', [380 20 70 25], ...
+            'String', 'Cancel', ...
+            'Callback', @d_cancel_btnCallback);
         uicontrol('Parent', d, ...
             'Style', 'pushbutton', ...
             'Position', [455 20 70 25], ...
             'String', 'Add', ...
             'Callback', @d_add_btnCallback);
-        uicontrol('Parent', d, ...
-            'Style', 'pushbutton', ...
-            'Position', [355 20 70 25], ...
-            'String', 'Cancel', ...
-            'Callback', @d_cancel_btnCallback);
         uicontrol(d_note_textbox);
 
         % Dialog Button Callbacks (nested)
         function d_add_btnCallback(~, ~)
             add_rec = true;
-            enc_level = d_enc_popup.Value - 1;
-            note_text = d_note_textbox.String;
+            rec_enc = d_enc_popup.Value - 1;
+            rec_text = d_note_textbox.String;
+            if (d_type_popup.Value == 1)
+                rec_type = 'Note';
+                rec_type_idx = REC_Note_IDX;
+            else
+                rec_type = 'Seiz';
+                rec_type_idx = REC_Seiz_IDX;
+            end
             close(d);
         end
         function d_cancel_btnCallback(~, ~)        
             close(d);
+        end
+        function d_type_ddCallback(~, ~)
+            if (d_type_popup.Value == 1)
+                set(d_text_label, 'String', 'Note Text:');
+            else
+                set(d_text_label, 'String', 'Description:');
+            end
         end
 
         uiwait(d);
@@ -2377,11 +2849,13 @@ function view_MED(varargin)
         end
 
         if (add_rec == true)
-            if (isempty(note_text))
-                errordlg('No note text entered', 'View MED');
+            if (isempty(rec_text))
+                if (strcmp(rec_type, 'Note') == true)
+                    errordlg('No note text entered', 'View MED');
+                end
                 adding_record = false;
-                delete(record_line);
-                delete(record_flag);
+                delete(new_record_line);
+                delete(new_record_flag);
                 add_record_button.Value = false;
                 add_record_flag = false;
                 set(fig, 'Pointer', 'arrow');
@@ -2396,7 +2870,10 @@ function view_MED(varargin)
             rec_time = page_start + round(page_duration * (data_x / data_ax_width));
    
             % add record to MED file
-            err = add_record_exec(chan_paths{1}, password, rec_time, note_text, enc_level);
+            mps.Persist = 2;  % close
+            [~] = matrix_MED_exec(mps);  % close to allow writing of record files by add_record_exec()
+            mps.Persist = 4; % set back to read
+            err = add_record_exec(chan_paths{1}, password, rec_type, rec_time, rec_text, rec_enc);
             clear add_record_exec;
             if (err < 0)
                 if (err == -1)
@@ -2405,8 +2882,8 @@ function view_MED(varargin)
                     errordlg('Insufficient access for selected encryption level', 'View MED');
                 end
                 adding_record = false;
-                delete(record_line);
-                delete(record_flag);
+                delete(new_record_line);
+                delete(new_record_flag);
                 add_record_button.Value = false;
                 add_record_flag = false;
                 set(fig, 'Pointer', 'arrow');
@@ -2415,30 +2892,34 @@ function view_MED(varargin)
 
             % add record line to session map
             new_rec_time_prop = double(rec_time - sess_start) / sess_duration;
-            break_flag = false;
-            for i = 1:numel(sess_record_times)
-                if (sess_record_times(i) > new_rec_time_prop)
-                    break_flag = true;
-                    break;
-                end
-            end
-            if (break_flag == true)
-                sess_record_times = [sess_record_times(1:(i - 1)); new_rec_time_prop; sess_record_times(i:end)];
+            if (isempty(sess_record_times{rec_type_idx}))
+                sess_record_times{rec_type_idx}(1) = new_rec_time_prop;
             else
-                sess_record_times = [sess_record_times; new_rec_time_prop];
+                break_flag = false;
+                for i = 1:numel(sess_record_times{rec_type_idx})
+                    if (sess_record_times{rec_type_idx}(i) > new_rec_time_prop)
+                        break_flag = true;
+                        break;
+                    end
+                end
+                if (break_flag == true)
+                    sess_record_times{rec_type_idx} = [sess_record_times{rec_type_idx}(1:(i - 1)); new_rec_time_prop; sess_record_times{rec_type_idx}(i:end)];
+                else
+                    sess_record_times{rec_type_idx} = [sess_record_times{rec_type_idx}; new_rec_time_prop];
+                end
             end
 
             % assume user would like to see new record
-            if records_flag == false
+            if (mps.Records == false)
                 records_checkbox.Value = true;
-                records_flag = true;
+                mps.Records = true;
             end
             plot_sess_record_times();
         end
 
         % clear flag
-        delete(record_line);
-        delete(record_flag);
+        delete(new_record_line);
+        delete(new_record_flag);
 
         % reset button
         add_record_button.Value = false;
@@ -2570,7 +3051,9 @@ function view_MED(varargin)
 
         % Update channel lists & plotting variables
         if (zoom_chans == true)
-            [~] = matrix_MED_exec(chan_paths, full_page_width, page_start, page_end, password, [], [], [], 2);  % close matrix to reset channel dimension
+            mps.Persist = 2;  % close
+            [~] = matrix_MED_exec(mps);  % close matrix to force re-read
+            mps.Persist = 4; % read
             j = 0;
             for i = 1:n_chans
                 if (sel_chans(i))
@@ -2583,6 +3066,7 @@ function view_MED(varargin)
             end
             n_chans = j;
             chan_paths = chan_paths(1:n_chans);
+            mps.Data = chan_paths;
             chan_list = chan_list(1:n_chans);
 
             plot_handles = [];
@@ -2628,8 +3112,12 @@ function view_MED(varargin)
 
 	% Figure Close Callback
     function figure_close_callback(~, ~)
-        [~] = matrix_MED_exec(chan_paths, full_page_width, page_start, page_end, password, [], [], [], 2);  % 'close' mode
+        mps.Persist = 2;  % close
+        [~] = matrix_MED_exec(mps);  % close matrix
         delete(fig);
+        if (isempty(rec_d) == false)
+            delete(rec_d);
+        end
     end
 
     % comment out to allow control to return to command window after loading 

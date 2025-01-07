@@ -5,17 +5,20 @@ function password_entry(src, ~)
     % src 'Callback' is disabled during entry, and called when enter/return hit
     % there may be a better way to do this, but it works nicely
 
+
     if (isempty(src.UserData))  % store password & callback in UserData
         set(src, 'Interruptible', 'off');  % do not allow other key presses until this is done
-        src.UserData = struct("password", '', "callback", src.Callback);
+        src.UserData = struct('password', '', 'callback', src.Callback);
         src.Callback = [];
     end
     c = get(gcf, 'CurrentCharacter');  % char(evt.Key) will not get shifted characters
     if (isempty(c))  % modifier key
         return;
     end
+
+    % non-printable characters
     len = length(src.UserData.password);
-    if (c < 33 || c > 126)  % non-printable characters
+    if (c < 33 || c > 126)  
         switch (c)
             case {8, 127}  % backspace, delete
                 len = len - 1;
@@ -33,6 +36,8 @@ function password_entry(src, ~)
                 return;
         end
     end
+
+    % printable characters
     src.UserData.password(len + 1) = c;
     ast_str = [repmat('*', [1 len]) c];
     src.String = ast_str;  % first time display (asterisks with last character)
@@ -42,3 +47,4 @@ function password_entry(src, ~)
     ast_str(end) = '*';  % replace with all asterisks
     src.String = ast_str;
 end
+
