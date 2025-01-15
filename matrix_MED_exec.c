@@ -249,7 +249,7 @@ void    mexFunction(si4 nlhs, mxArray *plhs[], si4 nrhs, const mxArray *prhs[])
 			if (cmps.extents_mode == EXTENTS_MODE_TIME)
 				cmps.start_time = get_si8_scalar(tmp_mxa);
 			else
-				cmps.start_index = get_si8_scalar(tmp_mxa);
+				cmps.start_index = get_si8_scalar(tmp_mxa) - 1;  // convert to c indexing;
 		}
 	}
 
@@ -276,7 +276,7 @@ void    mexFunction(si4 nlhs, mxArray *plhs[], si4 nrhs, const mxArray *prhs[])
 			if (cmps.extents_mode == EXTENTS_MODE_TIME)
 				cmps.end_time = get_si8_scalar(tmp_mxa);
 			else
-				cmps.end_index = get_si8_scalar(tmp_mxa);
+				cmps.end_index = get_si8_scalar(tmp_mxa) - 1;  // convert to c indexing;
 		}
 	}
 
@@ -655,13 +655,13 @@ mxArray	*matrix_MED(C_MPS *cmps)
 		} else {
 			if (cmps->start_index == SAMPLE_NUMBER_NO_ENTRY_m12)
 				cmps->start_index = BEGINNING_OF_SAMPLE_NUMBERS_m12;
-			else
+			else if (cmps->end_index == SAMPLE_NUMBER_NO_ENTRY_m12)
 				cmps->end_index = END_OF_SAMPLE_NUMBERS_m12;
 		}
 	} else {  // at least one time passed
 		if (cmps->start_time == UUTC_NO_ENTRY_m12)
 			cmps->start_time = BEGINNING_OF_TIME_m12;
-		if (cmps->end_time == UUTC_NO_ENTRY_m12)
+		else if (cmps->end_time == UUTC_NO_ENTRY_m12)
 			cmps->end_time = END_OF_TIME_m12;
 		cmps->start_index = cmps->end_index = SAMPLE_NUMBER_NO_ENTRY_m12;  // time supersedes indices
 	}

@@ -198,7 +198,7 @@ void    mexFunction(si4 nlhs, mxArray *plhs[], si4 nrhs, const mxArray *prhs[])
 			if (crps.extents_mode == EXTENTS_MODE_TIME)
 				crps.start_time = get_si8_scalar(tmp_mxa);
 			else
-				crps.start_index = get_si8_scalar(tmp_mxa);
+				crps.start_index = get_si8_scalar(tmp_mxa) - 1;  // convert to c indexing
 		}
 	}
 
@@ -225,7 +225,7 @@ void    mexFunction(si4 nlhs, mxArray *plhs[], si4 nrhs, const mxArray *prhs[])
 			if (crps.extents_mode == EXTENTS_MODE_TIME)
 				crps.end_time = get_si8_scalar(tmp_mxa);
 			else
-				crps.end_index = get_si8_scalar(tmp_mxa);
+				crps.end_index = get_si8_scalar(tmp_mxa) - 1;  // convert to c indexing;
 		}
 	}
 
@@ -443,17 +443,17 @@ mxArray     *read_MED(C_RPS *crps)
 		} else {
 			if (crps->start_index == SAMPLE_NUMBER_NO_ENTRY_m12)
 				crps->start_index = BEGINNING_OF_SAMPLE_NUMBERS_m12;
-			else
+			if (crps->end_index == SAMPLE_NUMBER_NO_ENTRY_m12)
 				crps->end_index = END_OF_SAMPLE_NUMBERS_m12;
 		}
 	} else {  // at least one time passed
 		if (crps->start_time == UUTC_NO_ENTRY_m12)
 			crps->start_time = BEGINNING_OF_TIME_m12;
-		if (crps->end_time == UUTC_NO_ENTRY_m12)
+		else if (crps->end_time == UUTC_NO_ENTRY_m12)
 			crps->end_time = END_OF_TIME_m12;
 		crps->start_index = crps->end_index = SAMPLE_NUMBER_NO_ENTRY_m12;  // time supersedes indices
 	}
-			
+
 	// copy global
 	sess = med_sess;
 	
@@ -774,29 +774,29 @@ void    build_metadata(SESSION_m12 *sess, mxArray *mat_sess)
 
 	// slice start sample number
         tmp_mxa = mxCreateNumericArray(n_dims, dims, mxINT64_CLASS, mxREAL);
-        if (slice->start_sample_number == SAMPLE_NUMBER_NO_ENTRY_m12)
+	if (globals_m12->time_series_frequencies_vary == TRUE_m12)
                 *((si8 *) mxGetPr(tmp_mxa)) = -1;
         else
                 *((si8 *) mxGetPr(tmp_mxa)) = slice->start_sample_number + 1;  // convert to one-based indexing
         mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_SLICE_START_SAMPLE_NUMBER_IDX_mat, tmp_mxa);
 
-       // slice end sample number
+       	// slice end sample number
         tmp_mxa = mxCreateNumericArray(n_dims, dims, mxINT64_CLASS, mxREAL);
         if (globals_m12->time_series_frequencies_vary == TRUE_m12)
                 *((si8 *) mxGetPr(tmp_mxa)) = -1;
-        else
-                *((si8 *) mxGetPr(tmp_mxa)) = globals_m12->number_of_session_samples;
-        mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_SESSION_NUMBER_OF_SAMPLES_IDX_mat, tmp_mxa);
+	else
+		*((si8 *) mxGetPr(tmp_mxa)) = slice->end_sample_number + 1;
+        mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_SLICE_END_SAMPLE_NUMBER_IDX_mat, tmp_mxa);
 
 	// session number of samples
 	tmp_mxa = mxCreateNumericArray(n_dims, dims, mxINT64_CLASS, mxREAL);
 	if (slice->start_sample_number == SAMPLE_NUMBER_NO_ENTRY_m12)
 		*((si8 *) mxGetPr(tmp_mxa)) = -1;
 	else
-		*((si8 *) mxGetPr(tmp_mxa)) = slice->end_sample_number + 1;  // convert to one-based indexing
-	mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_SLICE_END_SAMPLE_NUMBER_IDX_mat, tmp_mxa);
+		*((si8 *) mxGetPr(tmp_mxa)) = globals_m12->number_of_session_samples;
+	mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_SESSION_NUMBER_OF_SAMPLES_IDX_mat, tmp_mxa);
 
-       // session name
+       	// session name
         tmp_mxa = mxCreateString(globals_m12->fs_session_name);  // use file system name in case subset
         mxSetFieldByNumber(mat_sess_metadata, 0, METADATA_FIELDS_SESSION_NAME_IDX_mat, tmp_mxa);
         
@@ -1016,7 +1016,7 @@ void    build_metadata(SESSION_m12 *sess, mxArray *mat_sess)
 			tmp_mxa = mxGetFieldByNumber(mat_chan_metadata, 0, METADATA_FIELDS_SESSION_NUMBER_OF_SAMPLES_IDX_mat);
 			if (chan->Sgmt_records == NULL)
 				chan->Sgmt_records = G_build_Sgmt_records_array_m12(NULL, NULL, chan);
-			*((si8 *) mxGetPr(tmp_mxa)) = chan->Sgmt_records[n_sess_segs - 1].end_sample_number + 1;  // convert to one-based indexing
+			*((si8 *) mxGetPr(tmp_mxa)) = chan->Sgmt_records[n_sess_segs - 1].end_sample_number + 1;  // convert to count
 			// sampling frequency
 			tmp_mxa = mxGetFieldByNumber(mat_chan_metadata, 0, METADATA_FIELDS_SAMPLING_FREQUENCY_IDX_mat);
 			*((sf8 *) mxGetPr(tmp_mxa)) = tmd2->sampling_frequency;
