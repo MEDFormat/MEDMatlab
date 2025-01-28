@@ -335,14 +335,12 @@ function [mat, mps] = matrix_MED(varargin)
         errordlg('''SampDimMode'' must be a string, char array, index, or empty', 'Matrix MED');  % empty OK
         return;
     end
-    if (ischar(mps.SampDimMode))
-        switch (mps.SampDimMode)
-            case 'count'
-            case 'rate'
-            otherwise
-                errordlg('''SampDimMode'' options: count, rate', 'Matrix MED');
-                return;
-        end
+    switch (mps.SampDimMode)
+        case {'count', 0}
+        case {'rate', 1}
+        otherwise
+            errordlg('''SampDimMode'' options: count, rate', 'Matrix MED');
+            return;
     end
 
     % SampDim
@@ -364,14 +362,12 @@ function [mat, mps] = matrix_MED(varargin)
         errordlg('''TimeMode'' must be a string, char array, index, or empty', 'Matrix MED');  % empty OK
         return;
     end
-    if (ischar(mps.ExtMode))
-        switch (mps.ExtMode)
-            case 'time'
-            case 'indicies'
-            otherwise
-                errordlg('''ExtMode'' options: time, indices', 'Matrix MED');
-                return;
-        end
+    switch (mps.ExtMode)
+        case {'time',  0}
+        case {'indicies', 1}
+        otherwise
+            errordlg('''ExtMode'' options: time, indices', 'Matrix MED');
+            return;
     end
     
     % Start
@@ -406,14 +402,12 @@ function [mat, mps] = matrix_MED(varargin)
         errordlg('''TimeMode'' must be a string, char array, index, or empty', 'Matrix MED');  % empty OK
         return;
     end
-    if (ischar(mps.TimeMode))
-        switch (mps.TimeMode)
-            case {'relative', 0}
-            case {'absolute', 1}
-            otherwise
-                errordlg('''TimeMode'' options: duration, end_time', 'Matrix MED');
-                return;
-        end
+    switch (mps.TimeMode)
+        case {'duration', 0}
+        case {'end_time', 1}
+        otherwise
+            errordlg('''TimeMode'' options: duration, end_time', 'Matrix MED');
+            return;
     end
     
     % Pass
@@ -704,21 +698,19 @@ function [mat, mps] = matrix_MED(varargin)
         end
 
         % Filter
-        if (ischar(mps.Filt))
-            switch (mps.Filt)
-                case 'antialias'
-                    mps.Filt = 0;
-                case 'none'
-                    mps.Filt = 1;
-                case 'lowpass'
-                    mps.Filt = 2;
-                 case 'highpass'
-                    mps.Filt = 3;
-                case 'bandpass'
-                    mps.Filt = 4;
-                case 'bandstop'
-                    mps.Filt = 5;
-            end
+        switch (mps.Filt)
+            case 'antialias'
+                mps.Filt = 0;
+            case 'none'
+                mps.Filt = 1;
+            case 'lowpass'
+                mps.Filt = 2;
+             case 'highpass'
+                mps.Filt = 3;
+            case 'bandpass'
+                mps.Filt = 4;
+            case 'bandstop'
+                mps.Filt = 5;
         end
 
         % Format
@@ -797,7 +789,6 @@ function [mat, mps] = matrix_MED(varargin)
             end
         end
     end
-
 
     % Call mex function
     try

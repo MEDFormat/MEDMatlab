@@ -1490,6 +1490,10 @@ function matrix_MED_GUI(varargin)
     % Plot Pushbutton
     function plotPushbuttonCallback(~, ~)
         if specsChanged == true
+            saved_show_status = SHOW_MATRIX_MED_COMMAND;
+            SHOW_MATRIX_MED_COMMAND = false;
+            success = get_data();
+            SHOW_MATRIX_MED_COMMAND = saved_show_status;
             success = get_data();
             if success == false
                 return;
@@ -1951,14 +1955,18 @@ function matrix_MED_GUI(varargin)
         binterpolation = binterpDropdown.Value;
         out_mps.Binterp = binterpDropdown.String{binterpolation};
 
-        % show command
-        if (SHOW_MATRIX_MED_COMMAND == true)
-            show_command(data_paths);
-        end
 
         % run command
+        tic;
         mat = matrix_MED_exec(out_mps);
-        % handle error
+        exec_time = round(toc * 1e6);
+
+        % show command
+        if (SHOW_MATRIX_MED_COMMAND == true)
+            show_command(data_paths, exec_time);
+        end
+
+       % handle error
         if (islogical(mat))  % can be true, false, or structure
             if (mat == false)
                 set(fig, 'Pointer', 'arrow');
@@ -1974,7 +1982,7 @@ function matrix_MED_GUI(varargin)
     end  % get_data()
 
 
-    function show_command(data_paths)   
+    function show_command(data_paths, cl_exec_time)   
         
         % build command string
         command = ['[' matrixNameTextbox.String ', ' parametersNameTextbox.String '] = matrix_MED('];
@@ -2006,12 +2014,16 @@ function matrix_MED_GUI(varargin)
             end
             fl = [fl '''' char(data_paths(n_dirs)) '''};'];
     
+            tic;
             v = evalin('base', ['logical(exist(''' dir_str ''', ''var''))']);
+            fl_exec_time = round(toc * 1e6);
+            
             if (v == true)
                 fprintf(2, '\nThe variable ''%s'' exists in the workspace. To overwrite, execute:\n', dir_str);
             else
                 evalin('base', fl);
                 fprintf(2, '\nExecuted:\n');
+                append_history(fl, fl_exec_time);
             end
             disp(fl);
 
@@ -2210,7 +2222,8 @@ function matrix_MED_GUI(varargin)
       
         command = [command(1:(end - 2)) ');'];  % get rid of terminal ', ' & add closure
         fprintf(2, '\nExecuted:\n');
-        disp(command);        
+        disp(command);
+        append_history(command, cl_exec_time);
 
     end  % show_command()
 

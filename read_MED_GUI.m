@@ -801,6 +801,8 @@ function read_MED_GUI(varargin)
         sessionDirectoryTextbox.String = sessionDirectory;
         channelListbox.Value = [];
         referenceChannelTextbox.String = '';
+
+        specsChanged = true;
     end  % selectChannelsPushbuttonCallback()
 
 
@@ -813,6 +815,8 @@ function read_MED_GUI(varargin)
         channelListbox.Value = [];
         channelListbox.String = channelListbox.String(1:n_selected);
         sessionSelected = false;
+
+        specsChanged = true;
     end  % trimToSelectedPushbuttonCallback()
 
 
@@ -834,6 +838,8 @@ function read_MED_GUI(varargin)
         end
         channelListbox.Value = [];
         channelListbox.String = channelListbox.String(1:j);
+
+        specsChanged = true;
     end  % removeSelectedPushbuttonCallback()
 
 
@@ -1061,7 +1067,10 @@ function read_MED_GUI(varargin)
     % Plot Pushbutton
     function plotPushbuttonCallback(~, ~)
         if specsChanged == true
+            saved_show_status = SHOW_READ_MED_COMMAND;
+            SHOW_READ_MED_COMMAND = false;
             success = get_data();
+            SHOW_READ_MED_COMMAND = saved_show_status;
             if success == false
                 return;
             end
@@ -1357,13 +1366,15 @@ function read_MED_GUI(varargin)
         persistence = persistenceDropdown.Value;
         out_rps.Persist = persistenceDropdown.String{persistence};
         
+        tic;
+        slice = read_MED_exec(out_rps);
+        exec_time = round(toc * 1e6);
+
         if (SHOW_READ_MED_COMMAND == true)
-            show_command(data_paths);
+            show_command(data_paths, exec_time);
         end
 
-        slice = read_MED_exec(out_rps);
-
-        if islogical(slice)  % can be true, false, or structure
+       if islogical(slice)  % can be true, false, or structure
             if slice == false
                 set(fig, 'Pointer', 'arrow');
                 errordlg('Read error', 'Read MED GUI');
@@ -1378,7 +1389,7 @@ function read_MED_GUI(varargin)
     end  % get_data()
 
 
-    function show_command(data_paths)   
+    function show_command(data_paths, cl_exec_time)
         
         % build command string
         command = ['[' sliceNameTextbox.String ', ' parametersNameTextbox.String '] = read_MED('];
@@ -1410,12 +1421,16 @@ function read_MED_GUI(varargin)
             end
             fl = [fl '''' char(data_paths(n_dirs)) '''};'];
     
+            tic;
             v = evalin('base', ['logical(exist(''' dir_str ''', ''var''))']);
+            fl_exec_time = round(toc * 1e6);
+
             if (v == true)
                 fprintf(2, '\nThe variable ''%s'' exists in the workspace. To overwrite, execute:\n', dir_str);
             else
                 evalin('base', fl);
                 fprintf(2, '\nExecuted:\n');
+                append_history(fl, fl_exec_time);
             end
             disp(fl);
 
@@ -1530,7 +1545,8 @@ function read_MED_GUI(varargin)
       
         command = [command(1:(end - 2)) ');'];  % get rid of terminal ', ' & add closure
         fprintf(2, '\nExecuted:\n');
-        disp(command);        
+        disp(command);
+        append_history(command, cl_exec_time);
 
     end  % show_command()
 
